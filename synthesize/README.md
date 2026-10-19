@@ -1,6 +1,6 @@
 # Synthesize
 
-A Claude skill that reads a video, article, essay or podcast for what it means to you, not just what it says.
+A Claude skill that reads a video, article, essay or podcast for what it means to you.
 
 ## Why I made it
 
@@ -32,7 +32,7 @@ The newest step came from [Graft](../graft/). Grafting a video about learning wi
 - **Claude Code:** copy the `synthesize` folder into `~/.claude/skills/`.
 - **claude.ai:** zip the `synthesize` folder and upload it in your skills settings.
 
-The first time it runs, it asks a few questions about you (your work, what you're building, the frameworks you read through, how you like to learn) and saves them as `my-context.md` beside the skill. That file is what makes the report yours. Keep it current.
+The first time it runs, it asks a few questions about you (your work, what you're building, the frameworks you read through, how you like to learn) and saves them as `my-context.md` beside the skill. That file is what makes the report personal to you, so it's worth updating when your work changes.
 
 ## Use
 

@@ -6,7 +6,7 @@ A Claude skill for deciding what, if anything, to take from the things people te
 
 "I have a feeling not all of this is needed at all." That's what I wrote when I pasted in a video about five MCP servers everyone supposedly needs. I'd been doing these reviews with Claude by hand, and I wanted a skill that could look at whatever I bring in, whether it's a transcript or a link to a GitHub repo, cross-reference it against what I already have, and report back what in it is valuable and how we might act on it.
 
-The bias isn't toward installing anybody's skill or mod. It's pretty much always using what they have as a reference, the way you might keep somebody's painting next to you and paint your own version of it. MCPs are the exception, because they give Claude access to something a prompt can't imitate.
+The bias is pretty much always toward using what they have as a reference, the way you might keep somebody's painting next to you and paint your own version of it. MCPs are the exception, because they give Claude access to something a prompt can't imitate.
 
 ## How I use it
 
@@ -18,14 +18,14 @@ There's a second reason I reach for it, which took me a while to notice. It help
 
 ## A run that earned its keep
 
-I grafted a video about learning with AI that listed ten roles AI can play. Six of them were already in my setup, each one built because a real piece of work needed it. But graft also noticed that my learning skills, including /synthesize, all handed me something to read and none of them asked me to produce anything. Two small borrows fixed that, and one of them became the "Say it back" step in /synthesize.
+I grafted a video about learning with AI that listed ten roles AI can play. Six of them were already in my setup, each one built because a piece of work needed it. But graft also noticed that my learning skills, including /synthesize, all handed me something to read and none of them asked me to produce anything. Two small borrows fixed that, and one of them became the "Say it back" step in /synthesize.
 
 ## What it does
 
 1. Checks its ledger first, so nothing gets reviewed twice without a reason.
 2. Breaks the source into items: each tool, repo, skill, technique or claim.
 3. Looks at what you actually have (skills, MCP servers, built-in tools, your projects) before judging anything.
-4. Gives each item one verdict: **Already covered** (and what covers it), **Borrow** (the idea, and exactly where it would land), **Install** (only for a real capability, with a short trust check), or **Skip**.
+4. Gives each item one verdict: **Already covered** (and what covers it), **Borrow** (the idea, and exactly where it would land), **Install** (only for something a prompt can't imitate, with a short trust check), or **Skip**.
 5. Looks past the list for one or two things worth more than any item, often cleanup.
 6. Reports in one short table, acts only on your yes for each item, and logs every verdict to `ledger.md`.
 
