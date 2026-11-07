@@ -1,0 +1,715 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Local Reviewer</title>
+<style>
+  :root {
+    --bg: #111317; --panel: #1a1d23; --panel2: #22262e; --line: #2e333d;
+    --text: #e8e6e1; --dim: #9aa0aa; --accent: #6aa8ff; --claude: #e0a83c; --done: #5fbf7f; --danger: #e06a6a; --rule: #b79cf2;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  button { font: inherit; color: var(--text); background: var(--panel2); border: 1px solid var(--line);
+    border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+  button:hover { border-color: var(--dim); }
+  header button { white-space: nowrap; }
+  button.on { background: var(--accent); border-color: var(--accent); color: #0b1220; }
+  .app { display: grid; grid-template-columns: minmax(0, 1fr) 360px; height: 100vh; }
+  .app.tx { grid-template-columns: minmax(0, 1fr) 380px 340px; }
+  .main { display: flex; flex-direction: column; min-width: 0; padding: 12px 16px; gap: 10px; }
+  header { display: flex; align-items: center; gap: 10px; position: relative; }
+  header h1 { font-size: 15px; font-weight: 600; margin: 0; flex: 1; min-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #save { color: var(--dim); font-size: 12px; white-space: nowrap; }
+  .stage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; background: #000; border-radius: 8px; overflow: hidden; }
+  video { max-width: 100%; max-height: 100%; display: block; }
+  .readout { display: flex; align-items: baseline; gap: 14px; font-variant-numeric: tabular-nums; }
+  #tc { font: 600 22px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .5px; }
+  #dur, #rate, #inpt { color: var(--dim); font-family: ui-monospace, Menlo, monospace; }
+  #inpt { color: var(--accent); }
+  .scrub { position: relative; height: 34px; cursor: pointer; user-select: none; touch-action: none; }
+  .track { position: absolute; left: 0; right: 0; top: 14px; height: 6px; background: var(--panel2); border-radius: 3px; }
+  .fill { position: absolute; left: 0; top: 14px; height: 6px; background: var(--accent); border-radius: 3px; opacity: .55; }
+  .range { position: absolute; top: 12px; height: 10px; background: var(--accent); opacity: .3; border-radius: 2px; }
+  .head { position: absolute; top: 8px; width: 2px; height: 18px; background: var(--text); margin-left: -1px; }
+  .tick { position: absolute; width: 3px; margin-left: -1.5px; border-radius: 1px; }
+  .tick.c { top: 0; height: 12px; background: var(--claude); }
+  .tick.c.done { background: var(--done); }
+  .tick.c.carried { opacity: .25; }
+  .tick.n { top: 22px; height: 12px; background: var(--accent); }
+  .tick.n.keep { background: var(--done); }
+  .tick.n.rule { background: var(--rule); }
+  .hover { position: absolute; top: -22px; transform: translateX(-50%); background: var(--panel2); border: 1px solid var(--line);
+    padding: 1px 6px; border-radius: 4px; font: 12px ui-monospace, Menlo, monospace; pointer-events: none; display: none; white-space: nowrap; }
+  .controls { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .controls .sep { width: 10px; }
+  .composer { display: none; flex-direction: column; gap: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+  .composer.open { display: flex; }
+  .composer .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .composer .at { font: 600 13px ui-monospace, Menlo, monospace; color: var(--accent); white-space: nowrap; }
+  .composer .quote, .note-quote { font-style: italic; color: var(--dim); border-left: 2px solid var(--accent); padding-left: 8px; }
+  .composer .quote { max-height: 66px; overflow-y: auto; }
+  .composer .reply, .note-reply { color: var(--claude); font-size: 12px; }
+  .composer .reply button { padding: 0 5px; font-size: 11px; margin-left: 4px; }
+  .composer textarea { width: 100%; }
+  .composer img { height: 64px; width: auto; align-self: flex-start; border-radius: 4px; display: block; }
+  .kinds { display: inline-flex; gap: 4px; }
+  .kinds button { padding: 2px 8px; font-size: 12px; }
+  .kinds button.on[data-k="keep"] { background: var(--done); border-color: var(--done); }
+  .kinds button.on[data-k="rule"] { background: var(--rule); border-color: var(--rule); }
+  .spacer { flex: 1; }
+  textarea { min-height: 54px; resize: vertical; background: var(--bg); color: var(--text); border: 1px solid var(--line);
+    border-radius: 6px; padding: 6px 8px; font: inherit; }
+  aside { background: var(--panel); border-left: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+  aside h2, .tx-head h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .8px; color: var(--dim); margin: 14px 14px 6px; display: flex; justify-content: space-between; gap: 8px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 14px 6px; }
+  .chips button { padding: 1px 7px; font-size: 11px; border-radius: 10px; }
+  .chips .gap { width: 6px; }
+  .list { overflow-y: auto; padding: 0 8px 8px; }
+  .list.claude { max-height: 46%; }
+  .list.notes { flex: 1; }
+  .item { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; padding: 8px 6px; border-radius: 6px; cursor: pointer; align-items: start; }
+  .item:hover { background: var(--panel2); }
+  .item.now { outline: 1px solid var(--line); background: var(--panel2); }
+  .item .t { font: 12px ui-monospace, Menlo, monospace; color: var(--claude); padding-top: 1px; white-space: nowrap; }
+  .notes .item .t { color: var(--accent); white-space: normal; }
+  .item > div { min-width: 0; }
+  .item.done .txt { color: var(--dim); text-decoration: line-through; }
+  .item.carried .txt { color: var(--dim); }
+  .item.replied .t::after { content: " · your note"; color: var(--accent); }
+  .item .txt { white-space: pre-wrap; word-break: break-word; }
+  .item .was { color: var(--done); font-size: 11px; }
+  .item input[type=checkbox] { margin-top: 2px; }
+  .item .acts { display: flex; gap: 4px; }
+  .item .acts button { padding: 1px 6px; font-size: 12px; }
+  .claude .item .acts { visibility: hidden; }
+  .claude .item:hover .acts { visibility: visible; }
+  .badge { font-size: 11px; border-radius: 4px; padding: 0 5px; color: #0b1220; margin-left: 6px; font-family: -apple-system, sans-serif; }
+  .badge.keep { background: var(--done); } .badge.rule { background: var(--rule); }
+  .note-img { max-width: 100%; border-radius: 4px; display: block; margin-top: 4px; }
+  .empty { color: var(--dim); padding: 8px 6px; font-size: 13px; }
+  /* Transcript */
+  .transcript { display: none; background: var(--bg); border-left: 1px solid var(--line); flex-direction: column; min-height: 0; position: relative; }
+  .app.tx .transcript { display: flex; }
+  .tx-head { display: flex; align-items: center; justify-content: space-between; padding-right: 10px; }
+  .tx-head h2 { margin-bottom: 8px; }
+  #follow { display: none; padding: 1px 8px; font-size: 12px; }
+  #follow.show { display: inline-block; }
+  #txBody { flex: 1; overflow-y: auto; padding: 0 14px 40px; font-size: 15px; line-height: 1.65; }
+  #txBody p { margin: 0 0 12px; }
+  .ptc { display: block; font: 11px ui-monospace, Menlo, monospace; color: var(--dim); cursor: pointer; user-select: none; }
+  .w { border-radius: 3px; cursor: pointer; }
+  .w:hover { background: var(--panel2); }
+  .w.cur { background: var(--accent); color: #0b1220; }
+  .w.noted { box-shadow: inset 0 -2px 0 var(--accent); }
+  .w.mk { box-shadow: -3px 0 0 var(--claude); }
+  .w.added { background: rgba(95, 191, 127, .2); }
+  .cutmark { display: block; user-select: none; cursor: pointer; font-size: 12px; line-height: 1.4; color: var(--danger); border-left: 2px solid var(--danger); padding: 2px 0 2px 8px; margin: 6px 0; }
+  .cutmark s { color: var(--dim); }
+  #selBtn { position: fixed; display: none; z-index: 5; padding: 3px 10px; font-size: 13px; background: var(--accent); border-color: var(--accent); color: #0b1220; }
+  .popover { display: none; position: absolute; top: 36px; right: 40px; z-index: 6; width: 340px; max-height: 60vh; overflow-y: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px; box-shadow: 0 8px 24px rgba(0,0,0,.5); }
+  .popover.open { display: block; }
+  .popover button { display: block; width: 100%; text-align: left; background: none; border: 0; padding: 6px 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .popover button:hover { background: var(--panel2); }
+  .popover button[disabled] { color: var(--dim); cursor: default; }
+  .popover hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
+  .help { display: none; position: fixed; inset: 0; z-index: 9; background: rgba(0,0,0,.6); align-items: center; justify-content: center; }
+  .help.open { display: flex; }
+  .help .box { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px 22px; max-width: 480px; }
+  .help table { border-collapse: collapse; }
+  .help td { padding: 3px 10px 3px 0; vertical-align: top; }
+  .help kbd { font: 12px ui-monospace, Menlo, monospace; background: var(--panel2); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }
+  @media (max-width: 1250px) { .app.tx { grid-template-columns: minmax(0, 1fr) 300px 280px; } }
+  @media (max-width: 900px) { .app, .app.tx { grid-template-columns: 1fr; height: auto; } .stage { min-height: 40vh; } aside, .transcript { border-left: 0; border-top: 1px solid var(--line); } #txBody { max-height: 60vh; } }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="main">
+    <header>
+      <h1 id="title">Local Reviewer</h1>
+      <span id="save">Loading…</span>
+      <button id="txBtn" title="Show or hide the transcript (T)">Transcript</button>
+      <button id="openBtn" title="Open another video in a new tab">Open another</button>
+      <button id="helpBtn" title="Keyboard shortcuts (?)">?</button>
+      <div class="popover" id="openPop"></div>
+    </header>
+    <div class="stage"><video id="v" src="/video" preload="auto" playsinline></video></div>
+    <div class="readout">
+      <span id="tc">00:00:00:00</span><span id="dur">/ --:--:--:--</span><span id="rate">1×</span><span id="inpt"></span>
+    </div>
+    <div class="scrub" id="scrub">
+      <div class="track"></div><div class="range" id="rangeBar" style="display:none"></div>
+      <div class="fill" id="fill"></div><div id="ticks"></div><div class="head" id="head"></div>
+      <div class="hover" id="hover"></div>
+    </div>
+    <div class="controls">
+      <button id="back10" title="Back 10 s (J or Shift+←)">−10 s</button>
+      <button id="prevF" title="Back 1 frame (←)">◀ 1f</button>
+      <button id="play" title="Play / pause (Space or K)">Play</button>
+      <button id="nextF" title="Forward 1 frame (→)">1f ▶</button>
+      <button id="fwd10" title="Forward 10 s (L or Shift+→)">+10 s</button>
+      <span class="sep"></span>
+      <span id="speeds"></span>
+      <span class="sep"></span>
+      <button id="prevM" title="Previous marker ([)">◀ Marker</button>
+      <button id="nextM" title="Next marker (])">Marker ▶</button>
+      <button id="tickBtn" title="Tick this marker, go to the next one and play (X)">Tick + next</button>
+      <span class="sep"></span>
+      <button id="grabBtn" title="Save this frame as a still on a note (G)">Grab frame</button>
+      <button id="noteBtn" title="Note here, or on the highlighted words (C or Enter)">+ Note</button>
+    </div>
+    <div class="composer" id="composer">
+      <div class="row">
+        <span class="at" id="composeAt"></span>
+        <span class="kinds" id="kinds">
+          <button data-k="change" title="Something to change">Change</button>
+          <button data-k="keep" title="This is working, leave it">Keep</button>
+          <button data-k="rule" title="Do this from now on, not just here">Rule</button>
+        </span>
+        <span class="reply" id="composeReply"></span>
+        <span class="spacer"></span>
+      </div>
+      <div class="quote" id="composeQuote" style="display:none"></div>
+      <img id="composeImg" style="display:none" alt="Grabbed frame">
+      <div class="row" style="flex-wrap:nowrap;align-items:flex-start">
+        <textarea id="noteText" placeholder="Your note. Enter saves, Shift+Enter for a new line, Tab changes the type, Esc cancels."></textarea>
+        <button id="saveNote">Save</button>
+      </div>
+    </div>
+  </div>
+  <div class="transcript" id="transcript">
+    <div class="tx-head"><h2><span>Transcript</span></h2><button id="follow" title="Keep the transcript on the current word">Follow</button></div>
+    <div id="txBody"><div class="empty" id="txMsg">Loading…</div></div>
+  </div>
+  <aside>
+    <h2><span>Claude's markers</span><span id="mCount"></span></h2>
+    <div class="chips" id="chips"></div>
+    <div class="list claude" id="mList"></div>
+    <h2><span>Your notes</span><span id="nCount"></span></h2>
+    <div class="list notes" id="nList"></div>
+  </aside>
+</div>
+<button id="selBtn">+ Note on these words</button>
+<div class="help" id="help"><div class="box">
+  <table>
+    <tr><td><kbd>Space</kbd> <kbd>K</kbd></td><td>Play / pause</td></tr>
+    <tr><td><kbd>J</kbd> <kbd>L</kbd></td><td>Back / forward 10 s</td></tr>
+    <tr><td><kbd>←</kbd> <kbd>→</kbd></td><td>One frame (pauses)</td></tr>
+    <tr><td><kbd>Shift</kbd>+<kbd>←</kbd> <kbd>→</kbd></td><td>Back / forward 10 s</td></tr>
+    <tr><td><kbd>-</kbd> <kbd>=</kbd></td><td>Slower / faster</td></tr>
+    <tr><td><kbd>[</kbd> <kbd>]</kbd></td><td>Previous / next marker in the list</td></tr>
+    <tr><td><kbd>X</kbd></td><td>Tick this marker, go to the next unticked one and play</td></tr>
+    <tr><td><kbd>C</kbd> <kbd>Enter</kbd></td><td>Note here, or on the highlighted words</td></tr>
+    <tr><td><kbd>G</kbd></td><td>Grab this frame as a still on a note</td></tr>
+    <tr><td><kbd>T</kbd></td><td>Show or hide the transcript</td></tr>
+    <tr><td><kbd>I</kbd></td><td>Set In, for a range with no words to highlight</td></tr>
+    <tr><td><kbd>Esc</kbd></td><td>Cancel the note, or clear In</td></tr>
+    <tr><td><kbd>?</kbd></td><td>This help</td></tr>
+  </table>
+  <p style="color:var(--dim);margin:12px 0 0">Click a word to jump there. <kbd>Cmd</kbd>+<kbd>F</kbd> searches the transcript. In a note, Tab switches Change, Keep and Rule. Replying to a marker happens on its own when you write a note while on it. Notes save to your Mac as you go. Nothing is uploaded.</p>
+</div></div>
+<script>
+(() => {
+  const SPEEDS = [0.5, 1, 1.25, 1.5, 2, 3];
+  const KINDS = ["change", "keep", "rule"];
+  const LEAD = 2;   // a change's marker sits this many seconds early, so playing shows it happen
+  const $ = id => document.getElementById(id);
+  const v = $("v");
+  let fps = 25, tcfps = 25, startFrame = 0, cfg = {}, ownMarkers = [], markers = [], notes = [], checked = new Set();
+  let inFrame = null, editing = null, saveTimer = null, dragging = false;
+  let words = [], wordEls = [], curWord = -1, following = true, selRange = null, changes = [], okayed = {}, prevLabel = "";
+  let draft = { kind: "change", quote: null, marker_id: null, image: null, range: null };
+  let filters = { scope: "draft", kind: "ALL", hideTicked: false };
+  let curMarker = null, lastListScroll = 0, nowItem = null;
+
+  const pad = n => String(n).padStart(2, "0");
+  function tc(f) {
+    f = Math.max(0, Math.round(f)) + startFrame;
+    const ff = f % tcfps, s = Math.floor(f / tcfps);   // non-drop timecode, as Premiere shows it
+    return `${pad(Math.floor(s / 3600))}:${pad(Math.floor(s / 60) % 60)}:${pad(s % 60)}:${pad(ff)}`;
+  }
+  const frameNow = () => Math.floor(v.currentTime * fps + 1e-3);
+  const lastFrame = () => Math.max(0, Math.floor((v.duration || 0) * fps) - 1);
+  function seekFrame(f) { f = Math.min(Math.max(0, f), lastFrame()); v.currentTime = (f + 0.25) / fps; }
+  const seekBy = s => seekFrame(frameNow() + Math.round(s * fps));
+  const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+                  set(k, val) { try { localStorage.setItem(k, val); } catch (e) {} } };
+
+  // Saving: every change goes to the local server, which writes the notes file.
+  function setSave(t) { $("save").textContent = t; }
+  function queueSave() {
+    setSave("Saving…");
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(async () => {
+      try {
+        const r = await fetch("/api/notes", { method: "PUT", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ notes, markers_checked: [...checked], markers_seen: markers.map(m => ({ id: m.id, frame: m.frame, text: m.text })) }) });
+        if (!r.ok) throw new Error(r.status);
+        const j = await r.json();
+        setSave(`Saved ${j.saved.slice(11)} · ${j.count} note${j.count === 1 ? "" : "s"}`);
+      } catch (e) { setSave("NOT SAVED: is the server still running?"); }
+    }, 250);
+  }
+
+  // Markers: Claude's list, plus one for each change in the speech since the last draft.
+  const kindOf = m => (/^[A-Z]{3,}\b/.exec(m.text || "") || ["OTHER"])[0];
+  function shorten(s, n) { return s.length > n ? s.slice(0, n) + "…" : s; }
+  function changeMarkers() {
+    return changes.map(c => {
+      const parts = [];
+      if (c.removed) parts.push(`removed "${shorten(c.removed, 120)}"`);
+      if (c.added) parts.push(`added "${shorten(c.added, 120)}"`);
+      const kind = c.removed && c.added ? "CHANGED" : c.added ? "ADDED" : "CUT";
+      const frame = Math.max(0, Math.round((c.at - LEAD) * fps));
+      return { id: "change-" + Math.round(c.at * 100), frame, auto: true,
+               text: `${kind}: ${parts.join("; ") || "a pause changed"} (${Math.abs(c.shift).toFixed(1)} s)` };
+    });
+  }
+  function rebuildMarkers() { markers = [...ownMarkers, ...changeMarkers()].sort((a, b) => a.frame - b.frame); }
+  const isCarried = m => !!okayed[m.id];
+  function visibleMarkers() {
+    return markers.filter(m => (filters.scope === "all" || !isCarried(m))
+      && (filters.kind === "ALL" || kindOf(m) === filters.kind)
+      && (!filters.hideTicked || !checked.has(m.id) || (curMarker && curMarker.id === m.id)));
+  }
+  function markerHere(within) {   // the marker being looked at: close before the playhead
+    const f = frameNow(), list = visibleMarkers(), span = fps * (within || 20);
+    if (curMarker && list.includes(curMarker) && f >= curMarker.frame - 1 && f <= curMarker.frame + span
+        && !list.some(m => m.frame > curMarker.frame && m.frame <= f)) return curMarker;
+    const before = list.filter(m => m.frame <= f + 1).pop();
+    return before && f - before.frame <= span ? before : null;
+  }
+  function saveFilters() { store.set("local-review-filters:" + cfg.video, JSON.stringify(filters)); }
+
+  // Readout and scrub bar.
+  function pct(f) { return lastFrame() ? (f / lastFrame()) * 100 : 0; }
+  function paint() {
+    const f = frameNow();
+    $("tc").textContent = tc(f);
+    $("fill").style.width = pct(f) + "%";
+    $("head").style.left = pct(f) + "%";
+    $("play").textContent = v.paused ? "Play" : "Pause";
+    $("rate").textContent = v.playbackRate + "×";
+    if (inFrame !== null) {
+      const a = Math.min(inFrame, f), b = Math.max(inFrame, f);
+      $("rangeBar").style.display = "block";
+      $("rangeBar").style.left = pct(a) + "%"; $("rangeBar").style.width = (pct(b) - pct(a)) + "%";
+      $("inpt").textContent = "In " + tc(inFrame);
+    } else { $("rangeBar").style.display = "none"; $("inpt").textContent = ""; }
+    document.querySelectorAll("#nList .item").forEach(el => {
+      const a = +el.dataset.f, b = el.dataset.e ? +el.dataset.e : a + fps * 3;
+      el.classList.toggle("now", f >= a && f <= b);
+    });
+    followMarkers(); paintWord();
+  }
+  function loop() { paint(); (v.requestVideoFrameCallback ? v.requestVideoFrameCallback(loop) : requestAnimationFrame(loop)); }
+  v.addEventListener("seeked", paint); v.addEventListener("pause", paint); v.addEventListener("play", loop);
+
+  // The marker list keeps the current marker in view, unless the reviewer just scrolled it.
+  function followMarkers() {
+    const m = markerHere(), id = m ? m.id : null;
+    if (id === nowItem) return;
+    nowItem = id;
+    const list = $("mList");
+    list.querySelectorAll(".item.now").forEach(el => el.classList.remove("now"));
+    if (!id) return;
+    const el = [...list.querySelectorAll(".item")].find(x => x.dataset.id === id);
+    if (!el) return;
+    el.classList.add("now");
+    if (Date.now() - lastListScroll > 4000) {
+      const a = list.getBoundingClientRect(), b = el.getBoundingClientRect();
+      if (b.top < a.top || b.bottom > a.bottom) list.scrollTop += b.top - a.top - (a.height - b.height) / 2;
+    }
+  }
+  for (const ev of ["wheel", "touchmove"]) $("mList").addEventListener(ev, () => { lastListScroll = Date.now(); }, { passive: true });
+
+  function drawTicks() {
+    const t = $("ticks"); t.innerHTML = "";
+    for (const m of markers) t.insertAdjacentHTML("beforeend", `<div class="tick c${checked.has(m.id) ? " done" : ""}${isCarried(m) ? " carried" : ""}" style="left:${pct(m.frame)}%" title="${esc(tc(m.frame) + "  " + m.text)}"></div>`);
+    for (const n of notes) t.insertAdjacentHTML("beforeend", `<div class="tick n ${esc(n.kind || "")}" style="left:${pct(n.frame)}%" title="${esc(tc(n.frame) + "  " + n.text)}"></div>`);
+  }
+  function drawChips() {
+    const carried = markers.filter(isCarried).length, chips = [];
+    if (carried) {
+      chips.push(`<button data-scope="draft" class="${filters.scope === "draft" ? "on" : ""}" title="Only what needs your eyes on this draft">This draft ${markers.length - carried}</button>`);
+      chips.push(`<button data-scope="all" class="${filters.scope === "all" ? "on" : ""}" title="Also show what you okayed on ${esc(prevLabel)}">All ${markers.length}</button>`);
+      chips.push(`<span class="gap"></span>`);
+    }
+    const inScope = markers.filter(m => filters.scope === "all" || !isCarried(m));
+    const kinds = [...new Set(inScope.map(kindOf))];
+    if (kinds.length > 1) {
+      chips.push(`<button data-kind="ALL" class="${filters.kind === "ALL" ? "on" : ""}">Every kind</button>`);
+      for (const k of kinds) chips.push(`<button data-kind="${esc(k)}" class="${filters.kind === k ? "on" : ""}">${esc(k === "OTHER" ? "Other" : k)} ${inScope.filter(m => kindOf(m) === k).length}</button>`);
+      chips.push(`<span class="gap"></span>`);
+    }
+    if (markers.length) chips.push(`<button data-hide="1" class="${filters.hideTicked ? "on" : ""}" title="Hide markers you've ticked">Hide ticked</button>`);
+    $("chips").innerHTML = chips.join("");
+  }
+  $("chips").onclick = e => {
+    const b = e.target.closest("button"); if (!b) return;
+    if (b.dataset.scope) filters.scope = b.dataset.scope;
+    if (b.dataset.kind) filters.kind = b.dataset.kind;
+    if (b.dataset.hide) filters.hideTicked = !filters.hideTicked;
+    saveFilters(); drawLists(); b.blur();
+  };
+  function drawLists() {
+    if (filters.kind !== "ALL" && !markers.some(m => kindOf(m) === filters.kind)) filters.kind = "ALL";
+    const shown = visibleMarkers(), carried = markers.filter(isCarried).length;
+    const left = markers.filter(m => !isCarried(m) && !checked.has(m.id)).length;
+    $("mCount").textContent = markers.length ? `${left} left${carried ? ` · ${carried} okayed earlier` : ""}` : "";
+    drawChips();
+    $("mList").innerHTML = shown.length ? shown.map(m => `
+      <div class="item${checked.has(m.id) ? " done" : ""}${isCarried(m) ? " carried" : ""}${notes.some(n => n.marker_id === m.id) ? " replied" : ""}" data-f="${m.frame}" data-id="${esc(m.id)}" data-kind="m">
+        <input type="checkbox" ${checked.has(m.id) ? "checked" : ""} title="Looked, fine">
+        <div><div class="t">${tc(m.frame)}</div><div class="txt">${esc(m.text)}</div>${isCarried(m) ? `<div class="was">Okayed on ${esc(okayed[m.id])}</div>` : ""}</div>
+        <div class="acts"><button data-act="reply" title="Write a note on this marker">Reply</button></div></div>`).join("")
+      : `<div class="empty">${markers.length ? "Nothing left in this view." : "No markers for this draft."}</div>`;
+    nowItem = null;
+    const sorted = [...notes].sort((a, b) => a.frame - b.frame);
+    $("nCount").textContent = notes.length || "";
+    $("nList").innerHTML = sorted.length ? sorted.map(n => {
+      const replied = n.marker_id && markers.find(m => m.id === n.marker_id);
+      return `
+      <div class="item" data-f="${n.frame}" ${n.end_frame != null ? `data-e="${n.end_frame}"` : ""} data-id="${esc(n.id)}" data-kind="n">
+        <span></span>
+        <div><div class="t">${tc(n.frame)}${n.end_frame != null ? " – " + tc(n.end_frame) : ""}${n.kind ? `<span class="badge ${esc(n.kind)}">${n.kind === "keep" ? "Keep" : "Rule"}</span>` : ""}</div>
+          ${replied ? `<div class="note-reply">Reply to: ${esc(shorten(replied.text, 60))}</div>` : ""}
+          ${n.quote ? `<div class="note-quote">${esc(shorten(n.quote, 220))}</div>` : ""}
+          <div class="txt">${esc(n.text)}</div>
+          ${n.image_url ? `<img class="note-img" src="${esc(n.image_url)}" alt="Grabbed frame" loading="lazy">` : ""}</div>
+        <div class="acts"><button data-act="edit">Edit</button><button data-act="del">✕</button></div></div>`; }).join("")
+      : `<div class="empty">Press C (or + Note) to leave a note at the current frame, or highlight words in the transcript.</div>`;
+    drawTicks(); markWords();
+    if (!v.seeking) paint();
+  }
+  for (const list of ["mList", "nList"]) $(list).addEventListener("click", e => {
+    const it = e.target.closest(".item"); if (!it) return;
+    const id = it.dataset.id;
+    if (e.target.type === "checkbox") { e.target.checked ? checked.add(id) : checked.delete(id); drawLists(); queueSave(); return; }
+    if (e.target.dataset.act === "del") { if (confirm("Delete this note?")) { notes = notes.filter(n => n.id !== id); drawLists(); queueSave(); } return; }
+    if (e.target.dataset.act === "edit") { const n = notes.find(n => n.id === id); seekFrame(n.frame); openComposer(n); return; }
+    if (e.target.dataset.act === "reply") { const m = markers.find(m => m.id === id); curMarker = m; v.pause(); seekFrame(m.frame); openComposer(null, { marker: m }); return; }
+    v.pause();
+    if (it.dataset.kind === "m") curMarker = markers.find(m => m.id === id) || null;
+    seekFrame(+it.dataset.f);
+  });
+
+  // Scrubbing: click or drag anywhere on the bar.
+  const scrub = $("scrub");
+  function frameAt(x) { const r = scrub.getBoundingClientRect(); return Math.round(Math.min(1, Math.max(0, (x - r.left) / r.width)) * lastFrame()); }
+  scrub.addEventListener("pointerdown", e => { dragging = true; scrub.setPointerCapture(e.pointerId); seekFrame(frameAt(e.clientX)); });
+  scrub.addEventListener("pointermove", e => {
+    const f = frameAt(e.clientX), h = $("hover"), r = scrub.getBoundingClientRect();
+    h.style.display = "block"; h.style.left = (e.clientX - r.left) + "px"; h.textContent = tc(f);
+    if (dragging) seekFrame(f);
+  });
+  scrub.addEventListener("pointerup", () => { dragging = false; });
+  scrub.addEventListener("pointerleave", () => { $("hover").style.display = "none"; });
+
+  // Notes.
+  function drawDraft() {
+    document.querySelectorAll("#kinds button").forEach(b => b.classList.toggle("on", b.dataset.k === draft.kind));
+    const m = draft.marker_id && markers.find(x => x.id === draft.marker_id);
+    $("composeReply").innerHTML = m ? `Reply to: ${esc(shorten(m.text, 50))}<button id="noReply" title="Not about this marker">✕</button>` : "";
+    $("composeQuote").style.display = draft.quote ? "block" : "none";
+    $("composeQuote").textContent = draft.quote || "";
+    $("composeImg").style.display = draft.image ? "block" : "none";
+    if (draft.image) $("composeImg").src = draft.image.url;
+  }
+  function openComposer(existing, opts) {
+    opts = opts || {};
+    v.pause();
+    editing = existing || null;
+    const sel = !existing && selRange;
+    let f, e;
+    if (existing) { f = existing.frame; e = existing.end_frame; }
+    else if (sel) { f = Math.floor(words[sel[0]].s * fps); e = Math.max(f, Math.ceil(words[sel[1]].e * fps) - 1); seekFrame(f); }
+    else if (inFrame !== null) { f = Math.min(inFrame, frameNow()); e = Math.max(inFrame, frameNow()); }
+    else { f = frameNow(); e = null; }
+    const here = opts.marker || (!existing && !sel && markerHere(8));   // a note soon after a marker is about it
+    draft = existing
+      ? { kind: existing.kind || "change", quote: existing.quote || null, marker_id: existing.marker_id || null,
+          image: existing.image ? { url: existing.image_url, path: existing.image } : null }
+      : { kind: "change", quote: sel ? words.slice(sel[0], sel[1] + 1).map(w => w.w).join(" ") : null,
+          marker_id: here ? here.id : null, image: opts.image || null };
+    $("composer").dataset.f = f; $("composer").dataset.e = e == null ? "" : e;
+    $("composeAt").textContent = tc(f) + (e != null && e !== f ? " – " + tc(e) : "");
+    $("noteText").value = existing ? existing.text : "";
+    drawDraft();
+    clearSelection();
+    $("composer").classList.add("open"); $("noteText").focus();
+  }
+  function closeComposer() { $("composer").classList.remove("open"); editing = null; $("noteText").blur(); }
+  function saveComposer() {
+    const text = $("noteText").value.trim();
+    if (!text && !draft.quote && !draft.image) { closeComposer(); return; }
+    const f = +$("composer").dataset.f, e = $("composer").dataset.e === "" ? null : +$("composer").dataset.e;
+    const now = new Date().toISOString().slice(0, 19);
+    const extra = { kind: draft.kind === "change" ? undefined : draft.kind, quote: draft.quote || undefined,
+                    marker_id: draft.marker_id || undefined, image: draft.image ? draft.image.path : undefined,
+                    image_url: draft.image ? draft.image.url : undefined };
+    if (editing) Object.assign(editing, { text, updated: now }, extra);
+    else notes.push({ id: "n" + Date.now().toString(36), frame: f, tc: tc(f), end_frame: e !== f ? e : null,
+      end_tc: e != null && e !== f ? tc(e) : null, text, created: now, updated: now, ...extra });
+    inFrame = null; closeComposer(); drawLists(); queueSave(); paint();
+  }
+  $("saveNote").onclick = saveComposer;
+  $("kinds").onclick = e => { const k = e.target.dataset.k; if (k) { draft.kind = k; drawDraft(); $("noteText").focus(); } };
+  $("composeReply").onclick = e => { if (e.target.id === "noReply") { draft.marker_id = null; drawDraft(); $("noteText").focus(); } };
+  $("noteText").addEventListener("keydown", e => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); saveComposer(); }
+    else if (e.key === "Escape") { e.preventDefault(); closeComposer(); }
+    else if (e.key === "Tab") { e.preventDefault(); draft.kind = KINDS[(KINDS.indexOf(draft.kind) + (e.shiftKey ? 2 : 1)) % 3]; drawDraft(); }
+    e.stopPropagation();
+  });
+
+  // Transcript: one span per word, so a click or a highlight knows its exact time.
+  function setTx(on) {
+    $("app").classList.toggle("tx", on); $("txBtn").classList.toggle("on", on);
+    store.set("local-review-tx", on ? "1" : "0");
+    if (on) { following = true; $("follow").classList.remove("show"); curWord = -1; paintWord(); }
+  }
+  function renderTranscript() {
+    const body = $("txBody");
+    if (!words.length) { $("txMsg").textContent = "No speech found in this file."; return; }
+    const cuts = [...changes].sort((a, b) => a.at - b.at);
+    let c = 0, html = [], para = [], since = 0;
+    const flush = () => { if (para.length) { html.push(`<p>${para.join(" ")}</p>`); para = []; since = 0; } };
+    const inAdded = s => changes.some(x => x.added && s >= x.at - 0.01 && s < x.end);
+    words.forEach((w, i) => {
+      while (c < cuts.length && cuts[c].at <= w.s + 0.01) {
+        const x = cuts[c++];
+        if (x.removed || !x.added) {
+          flush();
+          html.push(`<div class="cutmark" data-s="${x.at}">Cut here since ${esc(prevLabel)} (${Math.abs(x.shift).toFixed(1)} s)${x.removed ? `: <s>${esc(shorten(x.removed, 240))}</s>` : ""}</div>`);
+        }
+      }
+      if (!para.length) para.push(`<span class="ptc" data-i="${i}">${tc(w.s * fps).slice(0, 8)}</span>`);
+      para.push(`<span class="w${inAdded(w.s) ? " added" : ""}" data-i="${i}">${esc(w.w)}</span>`);
+      since++;
+      const next = words[i + 1];
+      if (/[.?!]["”']?$/.test(w.w) && next && (next.s - w.e > 1.2 || since > 70)) flush();
+    });
+    flush();
+    body.innerHTML = html.join("");
+    wordEls = [...body.querySelectorAll(".w")];
+    curWord = -1; markWords(); paintWord();
+  }
+  function wordAt(t) {
+    let lo = 0, hi = words.length - 1, ans = -1;
+    while (lo <= hi) { const mid = (lo + hi) >> 1; if (words[mid].s <= t) { ans = mid; lo = mid + 1; } else hi = mid - 1; }
+    return ans;
+  }
+  function paintWord() {
+    if (!words.length || !$("app").classList.contains("tx")) return;
+    const i = wordAt(v.currentTime);
+    if (i === curWord) return;
+    if (wordEls[curWord]) wordEls[curWord].classList.remove("cur");
+    curWord = i;
+    const el = wordEls[i]; if (!el) return;
+    el.classList.add("cur");
+    if (following) {
+      const body = $("txBody"), a = body.getBoundingClientRect(), b = el.getBoundingClientRect();
+      if (b.top < a.top + a.height * 0.2 || b.bottom > a.top + a.height * 0.7) { body.scrollTop += b.top - a.top - a.height * 0.35; }
+    }
+  }
+  function markWords() {
+    if (!wordEls.length) return;
+    wordEls.forEach(el => el.classList.remove("noted", "mk"));
+    for (const n of notes) {
+      if (n.end_frame == null) continue;
+      const a = n.frame / fps, b = n.end_frame / fps;
+      for (let i = Math.max(0, wordAt(a)); i < words.length && words[i].s < b; i++) if (words[i].e > a) wordEls[i].classList.add("noted");
+    }
+    for (const m of visibleMarkers()) {
+      let i = wordAt(m.frame / fps); if (i < 0) i = 0; else if (words[i].s < m.frame / fps && i + 1 < words.length) i++;
+      if (wordEls[i]) { wordEls[i].classList.add("mk"); wordEls[i].title = m.text; }
+    }
+  }
+  const wordOf = node => { const el = node && (node.nodeType === 1 ? node : node.parentElement); return el && el.closest ? el.closest(".w") : null; };
+  function clearSelection() { selRange = null; $("selBtn").style.display = "none"; const s = getSelection(); if (s && !s.isCollapsed) s.removeAllRanges(); }
+  function readSelection() {
+    const s = getSelection();
+    if (!s || s.isCollapsed || !s.rangeCount || !$("txBody").contains(s.anchorNode)) { selRange = null; $("selBtn").style.display = "none"; return; }
+    const hit = wordEls.filter(el => s.containsNode(el, true)).map(el => +el.dataset.i);
+    if (!hit.length) { selRange = null; $("selBtn").style.display = "none"; return; }
+    selRange = [hit[0], hit[hit.length - 1]];
+    const r = s.getRangeAt(0).getBoundingClientRect(), b = $("selBtn");
+    b.style.display = "block";
+    b.style.left = Math.max(8, Math.min(innerWidth - 200, r.left)) + "px";
+    b.style.top = Math.max(8, r.top - 36) + "px";
+  }
+  $("txBody").addEventListener("mouseup", () => setTimeout(readSelection, 0));
+  document.addEventListener("selectionchange", () => { const s = getSelection(); if (!s || s.isCollapsed) { selRange = null; $("selBtn").style.display = "none"; } });
+  $("selBtn").addEventListener("mousedown", e => e.preventDefault());
+  $("selBtn").onclick = () => openComposer();
+  $("txBody").addEventListener("click", e => {
+    const s = getSelection();
+    if (s && !s.isCollapsed) return;
+    const cut = e.target.closest(".cutmark");
+    if (cut) { seekFrame(Math.round((+cut.dataset.s - LEAD) * fps)); following = true; $("follow").classList.remove("show"); return; }
+    const w = e.target.closest(".w, .ptc");
+    if (w) { seekFrame(Math.ceil(words[+w.dataset.i].s * fps)); following = true; $("follow").classList.remove("show"); }
+  });
+  for (const ev of ["wheel", "touchmove"]) $("txBody").addEventListener(ev, () => { following = false; $("follow").classList.add("show"); }, { passive: true });
+  $("follow").onclick = () => { following = true; $("follow").classList.remove("show"); curWord = -1; paintWord(); };
+  $("txBtn").onclick = () => { setTx(!$("app").classList.contains("tx")); $("txBtn").blur(); };
+
+  // What the server is working out behind the page: the transcript, then the comparison.
+  let gotWords = false;
+  async function poll() {
+    let st;
+    try {
+      const r = await fetch("/api/status");
+      if (r.status === 404) {   // this reviewer started before the transcript existed; notes still save
+        $("txMsg").textContent = "This reviewer started before the transcript was added. Drop the video on Local Reviewer again to get it.";
+        return;
+      }
+      st = await r.json();
+    } catch (e) { setTimeout(poll, 3000); return; }
+    const t = st.transcript || {}, c = st.compare || {};
+    if (t.status === "working") $("txMsg") && ($("txMsg").textContent = `Transcribing this export… ${t.pct || 0}%. The video is ready to review meanwhile.`);
+    else if (t.status === "failed") $("txMsg") && ($("txMsg").textContent = "No transcript: " + t.error);
+    else if (t.status === "off") $("txMsg") && ($("txMsg").textContent = "No transcript for this review.");
+    else if (t.status === "ready" && !gotWords) {
+      gotWords = true;
+      words = (await (await fetch("/api/transcript")).json()).words || [];
+      renderTranscript();
+    }
+    if (c.status === "ready") {
+      changes = c.changes || []; okayed = c.okayed || {}; prevLabel = c.label || "the last draft";
+      rebuildMarkers();
+      if (words.length) renderTranscript();
+      drawLists();
+      return;
+    }
+    if (["none", "failed"].includes(c.status) && t.status !== "working") return;
+    setTimeout(poll, 1500);
+  }
+
+  // Grab a frame: a full-size still beside the notes, and onto the note being written.
+  async function grabFrame() {
+    v.pause();
+    const f = frameNow();
+    setSave("Grabbing frame…");
+    try {
+      const r = await fetch("/api/grab", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ frame: f }) });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error);
+      setSave("Frame saved");
+      if ($("composer").classList.contains("open")) { draft.image = j; drawDraft(); $("noteText").focus(); }
+      else openComposer(null, { image: j });
+    } catch (e) { setSave("Couldn't grab that frame"); }
+  }
+
+  // Open another: a video in this folder, or any video, in its own tab.
+  async function fillOpen() {
+    const pop = $("openPop");
+    let list = [];
+    try { list = (await (await fetch("/api/siblings")).json()).videos || []; } catch (e) {}
+    pop.innerHTML = list.map(x => `<button data-name="${esc(x.name)}" ${x.current ? "disabled" : ""} title="${esc(x.name)}">${esc(x.name)}${x.current ? " (this one)" : ""}</button>`).join("")
+      + (list.length ? "<hr>" : "") + `<button data-choose="1">Choose a file…</button>`;
+  }
+  $("openBtn").onclick = async () => { const p = $("openPop"); if (p.classList.toggle("open")) await fillOpen(); $("openBtn").blur(); };
+  $("openPop").onclick = async e => {
+    const b = e.target.closest("button"); if (!b || b.disabled) return;
+    $("openPop").classList.remove("open");
+    const post = body => fetch("/api/open", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(r => r.json());
+    try {
+      if (b.dataset.choose) { const j = await post({ choose: true }); if (j.error) setSave("Couldn't open it"); return; }
+      // Opened during the click so the browser allows the tab; named so a second click reuses it.
+      // If the browser refuses a new tab, the server asks the Mac to open it instead.
+      const tab = window.open("about:blank", "local-review:" + b.dataset.name);
+      const j = await post({ name: b.dataset.name, open: !tab });
+      if (!j.url) { if (tab) tab.close(); setSave("Couldn't open it"); }
+      else if (tab) tab.location = j.url;
+    } catch (err) { setSave("Couldn't open it"); }
+  };
+  document.addEventListener("click", e => { if (!e.target.closest("#openPop, #openBtn")) $("openPop").classList.remove("open"); });
+
+  // Controls.
+  const toggle = () => (v.paused ? v.play() : v.pause());
+  function setRate(r) { v.playbackRate = r; document.querySelectorAll("#speeds button").forEach(b => b.classList.toggle("on", +b.dataset.r === r)); paint(); }
+  function stepRate(d) { const i = SPEEDS.indexOf(v.playbackRate); setRate(SPEEDS[Math.min(SPEEDS.length - 1, Math.max(0, (i < 0 ? 1 : i) + d))]); }
+  function jumpMarker(d) {
+    const f = frameNow(), ms = visibleMarkers();
+    const m = d > 0 ? ms.find(m => m.frame > f + 1) : [...ms].reverse().find(m => m.frame < f - 1);
+    if (m) { curMarker = m; v.pause(); seekFrame(m.frame); }
+  }
+  function tickAndNext() {
+    const here = markerHere(), from = here ? here.frame : frameNow();
+    const list = visibleMarkers();
+    if (here) checked.add(here.id);
+    const next = list.find(m => m.frame > from && !checked.has(m.id));
+    curMarker = next || null;
+    drawLists();
+    if (here) queueSave();
+    if (next) { seekFrame(next.frame); v.play(); }
+    else { v.pause(); setSave("No more markers in this view"); }
+  }
+  $("speeds").innerHTML = SPEEDS.map(r => `<button data-r="${r}">${r}×</button>`).join(" ");
+  $("speeds").onclick = e => { if (e.target.dataset.r) setRate(+e.target.dataset.r); };
+  $("play").onclick = toggle; v.onclick = toggle;
+  $("back10").onclick = () => seekBy(-10); $("fwd10").onclick = () => seekBy(10);
+  $("prevF").onclick = () => { v.pause(); seekFrame(frameNow() - 1); };
+  $("nextF").onclick = () => { v.pause(); seekFrame(frameNow() + 1); };
+  $("prevM").onclick = () => jumpMarker(-1); $("nextM").onclick = () => jumpMarker(1);
+  $("tickBtn").onclick = tickAndNext; $("grabBtn").onclick = grabFrame;
+  $("noteBtn").addEventListener("mousedown", e => e.preventDefault());
+  $("noteBtn").onclick = () => openComposer();
+  $("helpBtn").onclick = () => $("help").classList.toggle("open");
+  $("help").onclick = () => $("help").classList.remove("open");
+
+  document.addEventListener("keydown", e => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    const k = e.key;
+    const map = {
+      " ": toggle, k: toggle, K: toggle, j: () => seekBy(-10), J: () => seekBy(-10), l: () => seekBy(10), L: () => seekBy(10),
+      ArrowLeft: () => { if (e.shiftKey) seekBy(-10); else { v.pause(); seekFrame(frameNow() - 1); } },
+      ArrowRight: () => { if (e.shiftKey) seekBy(10); else { v.pause(); seekFrame(frameNow() + 1); } },
+      "-": () => stepRate(-1), "=": () => stepRate(1), "+": () => stepRate(1),
+      "[": () => jumpMarker(-1), "]": () => jumpMarker(1), x: tickAndNext, X: tickAndNext,
+      c: () => openComposer(), C: () => openComposer(), Enter: () => openComposer(),
+      g: grabFrame, G: grabFrame, t: () => $("txBtn").click(), T: () => $("txBtn").click(),
+      i: () => { inFrame = frameNow(); paint(); }, I: () => { inFrame = frameNow(); paint(); },
+      Escape: () => { $("help").classList.remove("open"); $("openPop").classList.remove("open"); inFrame = null; clearSelection(); paint(); },
+      "?": () => $("help").classList.toggle("open"),
+    };
+    if (map[k]) { e.preventDefault(); map[k](); }
+  });
+
+  // Tell the server the page is still open (it stops itself once no page has pinged for a while).
+  setInterval(() => fetch("/api/ping").catch(() => {}), 30000);
+
+  // Remember where the reviewer left off (a convenience only; the notes file is the record).
+  const posKey = () => "local-review-pos:" + cfg.video;
+  setInterval(() => { store.set(posKey(), String(frameNow())); }, 2000);
+
+  (async () => {
+    cfg = await (await fetch("/api/config")).json();
+    fps = cfg.fps; tcfps = Math.round(fps); startFrame = cfg.start_frame || 0;
+    document.title = "Review · " + cfg.title; $("title").textContent = cfg.title;
+    ownMarkers = ((await (await fetch("/api/markers")).json()).markers || []).map((m, i) => ({ ...m, id: m.id || "m" + (i + 1) }));
+    rebuildMarkers();
+    const saved = await (await fetch("/api/notes")).json();
+    notes = saved.notes || []; checked = new Set(saved.markers_checked || []);
+    try { filters = { ...filters, ...JSON.parse(store.get("local-review-filters:" + cfg.video) || "{}") }; } catch (e) {}
+    setSave(notes.length ? `${notes.length} saved note${notes.length === 1 ? "" : "s"}` : "No notes yet");
+    setTx(store.get("local-review-tx") !== "0");
+    poll();
+    const go = () => {
+      $("dur").textContent = "/ " + tc(lastFrame());
+      drawLists(); setRate(1);
+      const p = store.get(posKey());
+      if (p) seekFrame(+p); else paint();
+    };
+    v.readyState >= 1 ? go() : v.addEventListener("loadedmetadata", go, { once: true });
+  })();
+})();
+</script>
+</body>
+</html>
