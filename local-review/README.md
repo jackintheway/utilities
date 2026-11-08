@@ -8,7 +8,7 @@ I've been editing video for 15 years. My review loop for my own drafts used to r
 
 So I asked Claude Code for something that lets me comment at any point and gives the assistant the timestamps the same way Frame.io does. It takes the parts I love from the tools I use: a transcript next to playback like Riverside and Descript, timestamped comments like Frame.io, and in and out points like Premiere.
 
-It doesn't edit, and for now that's on purpose. Because I can't change the cut from inside it, I have to put into words exactly what I want, and on several edits that took a cut from an A- to an A+.
+It doesn't edit, and for now that's on purpose. Because I can't change the cut from inside it, I have to put into words exactly what I want, and being forced to articulate what I really want is making me a better director and collaborator.
 
 ## What it does
 
