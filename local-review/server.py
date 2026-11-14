@@ -13,7 +13,13 @@ Notes file (written by the page, read by Claude):
     {"video": ..., "fps": 25, "title": ..., "updated": ...,
      "notes": [{"id", "frame", "tc", "end_frame", "end_tc", "text", "created", "updated",
                 "kind": "keep" or "rule" (absent means a change), "quote": the words highlighted,
-                "marker_id": the marker it replies to, "image": path of a grabbed still}],
+                "marker_id": the marker it replies to, "image": path of a grabbed still,
+                "cut": {"in", "out", "in_tc", "out_tc"}: a cut the reviewer demonstrated: "in" is the first frame
+                        removed, "out" the first frame kept after it. The player skipped it; the video is untouched,
+                "switch": {"to", "in", "out", "in_tc", "out_tc"}: a picture switch the reviewer demonstrated: the picture
+                        named "to" is up from frame "in" up to but not including "out". Both may carry "rec_in"
+                        and "rec_out", the same moments in seconds on the recording's clock, when a sources
+                        file gave the map}],
      "markers_checked": [marker id, ...],
      "markers_seen": [the list on the page], "video_stat": {"size", "mtime"}}
 The last two make a notes file complete on its own, so the next draft can tell what was okayed.
@@ -31,6 +37,8 @@ import tempfile
 import threading
 import time
 import webbrowser
+from array import array
+from urllib.parse import parse_qs
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -211,6 +219,18 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/transcript":
             t = transcribe.load(cfg["transcript"]) if cfg["transcript"] else None
             return self.send_json({"words": t["words"]} if t else {"words": []})
+        if path == "/api/sources":
+            src = sources(cfg)
+            return self.send_json({"pictures": [{"name": x["name"]} for x in src["pictures"]], "map": src["map"], "up": src["up"]})
+        if path.startswith("/picture/"):
+            pics = sources(cfg)["pictures"]
+            i = path[len("/picture/"):]
+            if not i.isdigit() or int(i) >= len(pics):
+                return self.send_error(404)
+            f = Path(pics[int(i)]["path"])
+            return self.send_file(f, mimetypes.guess_type(str(f))[0] or "video/mp4", ranged=True)
+        if path == "/api/wave":
+            return self.wave(cfg, parse_qs(self.path.partition("?")[2]))
         if path == "/api/siblings":
             here = cfg["video"]
             return self.send_json({"videos": [{"name": p.name, "current": p == here} for p in sorted(here.parent.iterdir())
@@ -238,6 +258,31 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/open":
             return self.open_another(cfg, body)
         self.send_error(404)
+
+    def wave(self, cfg, q):
+        """The loudness of a few seconds of the export, for the zoomed timeline at a cut's edge."""
+        try:
+            start = max(0.0, float(q["start"][0]))
+            dur = min(30.0, max(0.2, float(q["dur"][0])))
+            n = min(4000, max(20, int(q["n"][0])))
+        except (KeyError, ValueError, IndexError):
+            return self.send_error(400)
+        ffmpeg = transcribe.tool("ffmpeg")
+        if not ffmpeg:
+            return self.send_json({"error": "ffmpeg is missing"}, 500)
+        rate = 8000
+        r = subprocess.run([ffmpeg, "-nostdin", "-v", "error", "-ss", f"{start:.4f}", "-t", f"{dur:.4f}", "-i", str(cfg["video"]),
+                            "-vn", "-ac", "1", "-ar", str(rate), "-f", "s16le", "-"], capture_output=True)
+        a = array("h")
+        a.frombytes(r.stdout[:len(r.stdout) // 2 * 2])
+        if sys.byteorder == "big":
+            a.byteswap()
+        per = dur * rate / n
+        peaks = []
+        for i in range(n):
+            seg = a[int(i * per):int((i + 1) * per)]
+            peaks.append([round(min(seg) / 32768, 3), round(max(seg) / 32768, 3)] if seg else [0, 0])
+        self.send_json({"start": start, "dur": dur, "peaks": peaks})
 
     def grab(self, cfg, body):
         """Save the exact frame on screen as a full-size still beside the notes."""
@@ -350,6 +395,18 @@ class Handler(BaseHTTPRequestHandler):
                     left -= len(buf)
         except (BrokenPipeError, ConnectionResetError):
             pass   # the browser cancels requests whenever it seeks
+
+
+def sources(cfg):
+    """The raw pictures behind this export and its clock map, if Claude wrote a sources file for it:
+    what lets the reviewer try a picture switch. Only video files that exist are offered."""
+    base = re.sub(r"-premiere$", "", cfg["video"].stem)
+    d = transcribe.load(cfg["notes"].parent / f"{base}-sources.json") or {}
+    pics = [x for x in d.get("pictures") or [] if isinstance(x, dict) and x.get("name") and x.get("path")
+            and Path(x["path"]).suffix.lower() in VIDEO_EXT and Path(x["path"]).is_file()]
+    if len(pics) < 2 or not d.get("map"):
+        return {"pictures": [], "map": [], "up": []}
+    return {"pictures": pics, "map": d["map"], "up": d.get("up") or []}
 
 
 def frames_dir(cfg):

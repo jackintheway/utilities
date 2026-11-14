@@ -173,7 +173,41 @@ about the review needs Claude while it runs.
   (it's working, leave it) and Rule (do this from now on).
 - **A note written within 8 s of a marker replies to it,** which means "looked, not fine", the
   opposite of a tick. The ✕ takes the link off, or use Reply on the marker itself.
+- **A note on a range can show the cut it asks for.** Try this cut, in the note box, makes
+  playback skip the range so the reviewer hears the join; In and Out nudge each edge a frame and
+  replay it. Timeline opens a close-up of the sound, three seconds around each edge: drag the cut
+  point, or click a view and use the arrows (a frame, Shift 5) and Space, and the picture shows
+  the last frame kept or the first kept after. The note still has to say what they want: a cut
+  with no words won't save. Every tried cut plays together, so the draft can be watched as it
+  would be, and D (or the Cuts button) turns them off and on. It is a demonstration for Claude,
+  never an edit: the video and the editing project are untouched, and the browser's skip is good
+  to about a frame.
+- **A note can show a picture switch too, when the export has a sources file.** Try a switch
+  lays another raw picture over a stretch, in step with the export, so the reviewer sees the
+  switch happen. On a single frame it runs to the next switch already in the cut; on a range it
+  covers the range; it picks the picture that is up least there, and the reviewer can pick
+  another. Same nudges, timeline, words rule and D toggle as a cut, and one note can carry both.
+  Whatever is baked into the export at that spot (a title, a logo) is hidden under it. Without
+  the file the button isn't there; see "The sources file" below.
 - **Open another** lists the videos in this folder, or chooses any file, each in its own tab.
+
+### The sources file
+
+Claude writes it, from the editing project the export came from, as
+`<notes folder>/<video name>-sources.json`. How to read a project is up to the project, so no
+writer ships here. The shape:
+
+```
+{"pictures": [{"name": "Camera A", "path": "/full/path/to/raw-a.mp4"},
+              {"name": "Camera B", "path": "/full/path/to/raw-b.mp4"}],
+ "map": [{"export": s, "end": s, "recording": s}, ...],
+ "up":  [{"at": s, "end": s, "picture": "Camera A"}, ...]}
+```
+
+`pictures` are the raw recordings, which must share one clock. `map` takes each stretch of the
+export (from `export` to `end`, in seconds) back to the recording's clock, where it starts at
+`recording`. `up` says which picture the export shows when. Fewer than two pictures that exist
+on disk, or no map, and switches stay off.
 
 ## 4. Pull the notes
 
@@ -186,7 +220,11 @@ python3 ~/.claude/skills/local-review/notes_to_md.py <notes>/<video name>-review
 
 Then map the notes onto the edit, the way the project handles any round of notes. A note may
 carry the words highlighted, the marker it replies to and a still's path, and they come
-through in its text. Keep notes ask for no change, so don't touch those moments. Rule notes
+through in its text. A demonstrated cut comes through as exact frames on the export's clock
+(`in` is the first frame removed, `out` the first kept after): the reviewer heard that join, so
+make the cut on those frames, mapped to the recording's clock, rather than re-deciding the edges
+from the words. A demonstrated switch names its picture and frames the same way, and carries the
+recording's clock too (`rec_in`, `rec_out`, in seconds). Keep notes ask for no change, so don't touch those moments. Rule notes
 get their own list: file them in the project's rules, and say where. Ticked markers are
 listed under the table: ticked means "looked, fine", and an unticked one is worth asking about.
 

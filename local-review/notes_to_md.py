@@ -6,7 +6,8 @@
 A plain table a project's revision step can read, the same shape as a Frame.io notes round.
 Comment ids are the local note ids; "Pinned" is the frame the reviewer noted on, "Typed" any time they
 wrote in the text (flagged when they disagree by more than 2 s). The note text carries the
-words he highlighted, the marker he replied to and any still he grabbed. Keep and Rule notes
+words he highlighted, the marker he replied to, any still he grabbed and any cut he
+demonstrated (its exact frames: he tried it in the player and heard the join). Keep and Rule notes
 also get their own lists: a Keep asks for no change, and a Rule belongs in the project's rules
 not just this round. Claude's markers the reviewer ticked are listed below the
 table, since a checked marker means "looked, fine".
@@ -63,6 +64,15 @@ def main():
             parts.append(f"On the words \"{n['quote']}\":")
         if n["text"]:
             parts.append(n["text"])
+        c = n.get("cut")
+        if c:
+            parts.append(f"Demonstrated cut: {c['in_tc']} to {c['out_tc']} on the export's clock, frames {c['in']} up to but not "
+                         f"including {c['out']} ({c['out'] - c['in']} frames, {(c['out'] - c['in']) / fps:.2f} s).")
+        sw = n.get("switch")
+        if sw:
+            rec = (f" Recording clock: {sw['rec_in']:.2f} s to {sw['rec_out']:.2f} s." if sw.get("rec_in") is not None and sw.get("rec_out") is not None else "")
+            parts.append(f"Demonstrated switch: {sw['to']} up from {sw['in_tc']} to {sw['out_tc']} on the export's clock, frames {sw['in']} up to "
+                         f"but not including {sw['out']} ({sw['out'] - sw['in']} frames, {(sw['out'] - sw['in']) / fps:.2f} s).{rec}")
         if n.get("image"):
             parts.append(f"Still: {n['image']}")
         text = clean(" ".join(parts))

@@ -7,7 +7,7 @@
 <style>
   :root {
     --bg: #111317; --panel: #1a1d23; --panel2: #22262e; --line: #2e333d;
-    --text: #e8e6e1; --dim: #9aa0aa; --accent: #6aa8ff; --claude: #e0a83c; --done: #5fbf7f; --danger: #e06a6a; --rule: #b79cf2;
+    --text: #e8e6e1; --dim: #9aa0aa; --accent: #6aa8ff; --claude: #e0a83c; --done: #5fbf7f; --danger: #e06a6a; --rule: #b79cf2; --sw: #4cc9c0;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
@@ -23,8 +23,10 @@
   header { display: flex; align-items: center; gap: 10px; position: relative; }
   header h1 { font-size: 15px; font-weight: 600; margin: 0; flex: 1; min-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   #save { color: var(--dim); font-size: 12px; white-space: nowrap; }
-  .stage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; background: #000; border-radius: 8px; overflow: hidden; }
+  .stage { position: relative; flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; background: #000; border-radius: 8px; overflow: hidden; }
   video { max-width: 100%; max-height: 100%; display: block; }
+  video.pic { position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; object-fit: contain; background: #000; display: none; pointer-events: none; }
+  #picBadge { position: absolute; left: 10px; top: 10px; display: none; background: var(--sw); color: #06201e; font-size: 12px; font-weight: 600; border-radius: 4px; padding: 2px 8px; pointer-events: none; }
   .readout { display: flex; align-items: baseline; gap: 14px; font-variant-numeric: tabular-nums; }
   #tc { font: 600 22px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .5px; }
   #dur, #rate, #inpt { color: var(--dim); font-family: ui-monospace, Menlo, monospace; }
@@ -41,6 +43,12 @@
   .tick.n { top: 22px; height: 12px; background: var(--accent); }
   .tick.n.keep { background: var(--done); }
   .tick.n.rule { background: var(--rule); }
+  .cutbar { position: absolute; top: 11px; height: 12px; background: var(--danger); opacity: .55; border-radius: 2px; pointer-events: none; }
+  .cutbar.off { opacity: .2; }
+  .cutbar.trying { opacity: .85; }
+  .swbar { position: absolute; top: 25px; height: 6px; background: var(--sw); opacity: .7; border-radius: 2px; pointer-events: none; }
+  .swbar.off { opacity: .2; }
+  .swbar.trying { opacity: 1; }
   .hover { position: absolute; top: -22px; transform: translateX(-50%); background: var(--panel2); border: 1px solid var(--line);
     padding: 1px 6px; border-radius: 4px; font: 12px ui-monospace, Menlo, monospace; pointer-events: none; display: none; white-space: nowrap; }
   .controls { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
@@ -55,6 +63,22 @@
   .composer .reply button { padding: 0 5px; font-size: 11px; margin-left: 4px; }
   .composer textarea { width: 100%; }
   .composer img { height: 64px; width: auto; align-self: flex-start; border-radius: 4px; display: block; }
+  .cutrow { font-size: 12px; color: var(--dim); }
+  .cutrow button { padding: 2px 8px; font-size: 12px; }
+  .cutrow button.on { background: var(--danger); border-color: var(--danger); }
+  .cutrow .when, .note-cut { color: var(--danger); font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+  .swrow button.on, .swrow .pics button.on { background: var(--sw); border-color: var(--sw); color: #06201e; }
+  .swrow .when, .note-sw { color: var(--sw); font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+  .pics { display: inline-flex; gap: 4px; }
+  .note-cut button, .note-sw button { padding: 0 6px; font-size: 11px; margin-left: 6px; font-family: -apple-system, sans-serif; }
+  .tl { display: none; gap: 8px; flex-wrap: wrap; }
+  .tl .pane { flex: 1 1 380px; min-width: 0; position: relative; height: 96px; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; cursor: ew-resize; touch-action: none; user-select: none; outline: none; }
+  .tl .pane:focus { border-color: var(--danger); }
+  .tl canvas { width: 100%; height: 100%; display: block; }
+  .tl .lbl { position: absolute; left: 6px; top: 3px; font: 11px ui-monospace, Menlo, monospace; color: var(--text); pointer-events: none; text-shadow: 0 0 3px #000; }
+  .tl .hint { position: absolute; right: 6px; top: 3px; font-size: 11px; color: var(--dim); pointer-events: none; text-shadow: 0 0 3px #000; }
+  #cutsBtn { display: none; }
+  #cutsBtn.on { background: var(--danger); border-color: var(--danger); }
   .kinds { display: inline-flex; gap: 4px; }
   .kinds button { padding: 2px 8px; font-size: 12px; }
   .kinds button.on[data-k="keep"] { background: var(--done); border-color: var(--done); }
@@ -106,6 +130,8 @@
   .w.noted { box-shadow: inset 0 -2px 0 var(--accent); }
   .w.mk { box-shadow: -3px 0 0 var(--claude); }
   .w.added { background: rgba(95, 191, 127, .2); }
+  .w.democut { color: var(--danger); text-decoration: line-through; }
+  .w.demosw { box-shadow: inset 0 -2px 0 var(--sw); }
   .cutmark { display: block; user-select: none; cursor: pointer; font-size: 12px; line-height: 1.4; color: var(--danger); border-left: 2px solid var(--danger); padding: 2px 0 2px 8px; margin: 6px 0; }
   .cutmark s { color: var(--dim); }
   #selBtn { position: fixed; display: none; z-index: 5; padding: 3px 10px; font-size: 13px; background: var(--accent); border-color: var(--accent); color: #0b1220; }
@@ -131,12 +157,13 @@
     <header>
       <h1 id="title">Local Reviewer</h1>
       <span id="save">Loading…</span>
+      <button id="cutsBtn" title="Play the draft with or without the cuts and switches you've tried (D)"></button>
       <button id="txBtn" title="Show or hide the transcript (T)">Transcript</button>
       <button id="openBtn" title="Open another video in a new tab">Open another</button>
       <button id="helpBtn" title="Keyboard shortcuts (?)">?</button>
       <div class="popover" id="openPop"></div>
     </header>
-    <div class="stage"><video id="v" src="/video" preload="auto" playsinline></video></div>
+    <div class="stage" id="stage"><video id="v" src="/video" preload="auto" playsinline></video><div id="picBadge"></div></div>
     <div class="readout">
       <span id="tc">00:00:00:00</span><span id="dur">/ --:--:--:--</span><span id="rate">1×</span><span id="inpt"></span>
     </div>
@@ -173,6 +200,31 @@
         <span class="spacer"></span>
       </div>
       <div class="quote" id="composeQuote" style="display:none"></div>
+      <div class="row cutrow" id="cutRow" data-which="cut" style="display:none">
+        <button id="cutBtn" data-toggle="1" title="Show the cut you mean: playback skips this range. Nothing changes in the video or in your editing project.">Try this cut</button>
+        <span id="cutEdit" style="display:none">
+          <span class="when" id="cutWhen"></span>
+          <span>In</span><button data-nudge="in" data-d="-1" title="Start the cut a frame earlier">◀</button><button data-nudge="in" data-d="1" title="Start the cut a frame later">▶</button>
+          <span>Out</span><button data-nudge="out" data-d="-1" title="End the cut a frame earlier">◀</button><button data-nudge="out" data-d="1" title="End the cut a frame later">▶</button>
+          <button data-play="1" title="Play across the join">Play the join</button>
+          <button id="tlBtn" data-tl="1" title="A close-up of the sound at each edge of the cut, to set it to the frame">Timeline</button>
+        </span>
+      </div>
+      <div class="row cutrow swrow" id="swRow" data-which="sw" style="display:none">
+        <button id="swBtn" data-toggle="1" title="Show the picture switch you mean: the other picture plays over this stretch. Nothing changes in the video or in your editing project.">Try a switch</button>
+        <span id="swEdit" style="display:none">
+          <span class="pics" id="swPics"></span>
+          <span class="when" id="swWhen"></span>
+          <span>In</span><button data-nudge="in" data-d="-1" title="Switch a frame earlier">◀</button><button data-nudge="in" data-d="1" title="Switch a frame later">▶</button>
+          <span>Out</span><button data-nudge="out" data-d="-1" title="Switch back a frame earlier">◀</button><button data-nudge="out" data-d="1" title="Switch back a frame later">▶</button>
+          <button data-play="1" title="Play across the switch">Play it</button>
+          <button id="swTlBtn" data-tl="1" title="A close-up of the sound at each edge of the switch, to set it to the frame">Timeline</button>
+        </span>
+      </div>
+      <div class="tl" id="tl">
+        <div class="pane" data-edge="in" tabindex="0" title="Drag to move this edge. Click, then ← → move it a frame (Shift: 5), Space plays it."><canvas></canvas><span class="lbl"></span><span class="hint"></span></div>
+        <div class="pane" data-edge="out" tabindex="0" title="Drag to move this edge. Click, then ← → move it a frame (Shift: 5), Space plays it."><canvas></canvas><span class="lbl"></span><span class="hint"></span></div>
+      </div>
       <img id="composeImg" style="display:none" alt="Grabbed frame">
       <div class="row" style="flex-wrap:nowrap;align-items:flex-start">
         <textarea id="noteText" placeholder="Your note. Enter saves, Shift+Enter for a new line, Tab changes the type, Esc cancels."></textarea>
@@ -206,10 +258,11 @@
     <tr><td><kbd>G</kbd></td><td>Grab this frame as a still on a note</td></tr>
     <tr><td><kbd>T</kbd></td><td>Show or hide the transcript</td></tr>
     <tr><td><kbd>I</kbd></td><td>Set In, for a range with no words to highlight</td></tr>
+    <tr><td><kbd>D</kbd></td><td>Play with or without the cuts and switches you've tried</td></tr>
     <tr><td><kbd>Esc</kbd></td><td>Cancel the note, or clear In</td></tr>
     <tr><td><kbd>?</kbd></td><td>This help</td></tr>
   </table>
-  <p style="color:var(--dim);margin:12px 0 0">Click a word to jump there. <kbd>Cmd</kbd>+<kbd>F</kbd> searches the transcript. In a note, Tab switches Change, Keep and Rule. Replying to a marker happens on its own when you write a note while on it. Notes save to your Mac as you go. Nothing is uploaded.</p>
+  <p style="color:var(--dim);margin:12px 0 0">Click a word to jump there. <kbd>Cmd</kbd>+<kbd>F</kbd> searches the transcript. In a note, Tab switches Change, Keep and Rule. Replying to a marker happens on its own when you write a note while on it. A note on a range can carry a cut: Try this cut skips the range in playback so you hear the join, and saves its exact frames with your note. Timeline opens a close-up of the sound at each edge: drag the red line, or click a view and use <kbd>←</kbd> <kbd>→</kbd> for a frame (<kbd>Shift</kbd>: 5) and <kbd>Space</kbd> to play the join. When Claude has left the raw pictures for a draft, Try a switch lays another picture over a stretch the same way. It never changes the video. Notes save to your Mac as you go. Nothing is uploaded.</p>
 </div></div>
 <script>
 (() => {
@@ -221,9 +274,12 @@
   let fps = 25, tcfps = 25, startFrame = 0, cfg = {}, ownMarkers = [], markers = [], notes = [], checked = new Set();
   let inFrame = null, editing = null, saveTimer = null, dragging = false;
   let words = [], wordEls = [], curWord = -1, following = true, selRange = null, changes = [], okayed = {}, prevLabel = "";
-  let draft = { kind: "change", quote: null, marker_id: null, image: null, range: null };
+  let draft = { kind: "change", quote: null, marker_id: null, image: null, range: null, cut: null, sw: null };
   let filters = { scope: "draft", kind: "ALL", hideTicked: false };
   let curMarker = null, lastListScroll = 0, nowItem = null;
+  let cutsOn = true, joinStop = null, tlWhich = "cut";
+  let src = { pictures: [], map: [], up: [] }, picEls = {};
+  const JOIN_PRE = 2, JOIN_POST = 1.5;   // seconds played before and after a join
 
   const pad = n => String(n).padStart(2, "0");
   function tc(f) {
@@ -285,10 +341,193 @@
   }
   function saveFilters() { store.set("local-review-filters:" + cfg.video, JSON.stringify(filters)); }
 
+  // Demonstrated cuts: a note can carry the cut it asks for. Playback skips it so the reviewer hears the
+  // join; the video is never touched. cut.in is the first frame removed, cut.out the first kept after.
+  const composing = () => $("composer").classList.contains("open");
+  const savedCuts = () => notes.filter(n => n.cut && n !== editing).map(n => n.cut);
+  function activeCuts() {
+    const list = cutsOn ? savedCuts() : [];
+    return composing() && draft.cut ? [...list, draft.cut] : list;
+  }
+  function cutAt(f) { return activeCuts().find(c => f >= c.in - 1 && f < c.out); }
+  const cutSecs = c => (c.out - c.in) / fps;
+  function playJoin(c) {
+    joinStop = null;
+    v.pause();
+    seekFrame(c.in - Math.round(JOIN_PRE * fps));
+    const stop = Math.min(lastFrame(), c.out + Math.round(JOIN_POST * fps));
+    v.addEventListener("seeked", () => { joinStop = stop; v.play(); }, { once: true });
+  }
+  // Demonstrated switches: when Claude has written a sources file for this export (the raw pictures
+  // and the map from the export's clock to the recording's), a note can lay another picture over a
+  // stretch. sw.in is the first frame the picture is up, sw.out the first frame after it.
+  const PIC_PRE = 3;   // seconds before a switch that its picture starts playing, hidden, to be in step
+  function toRec(t) { const m = src.map.find(m => t >= m.export - 1e-4 && t < m.end); return m ? m.recording + t - m.export : null; }
+  const recOf = f => { const r = toRec(f / fps); return r == null ? undefined : Math.round(r * 1000) / 1000; };
+  function activeSw() {
+    const list = cutsOn ? notes.filter(n => n.switch && n !== editing).map(n => n.switch) : [];
+    return composing() && draft.sw ? [...list, draft.sw] : list;
+  }
+  function defaultSwitch(f, end) {
+    let out = end != null ? end + 1 : null;
+    if (out == null) { const u = src.up.find(u => f / fps >= u.at - 1e-3 && f / fps < u.end); out = u ? Math.round(u.end * fps) : f + Math.round(5 * fps); }
+    out = Math.max(f + 1, Math.min(lastFrame() + 1, out));
+    const a = f / fps, b = out / fps;   // the picture that is up least in this stretch is the one worth trying
+    const shown = name => src.up.reduce((t, u) => t + (u.picture === name ? Math.max(0, Math.min(b, u.end) - Math.max(a, u.at)) : 0), 0);
+    const to = [...src.pictures].sort((x, y) => shown(x.name) - shown(y.name))[0].name;
+    return { to, in: f, out };
+  }
+  function syncPictures(f) {
+    const list = activeSw();
+    const on = [...list].reverse().find(s => f >= s.in && f < s.out);
+    const next = on || list.find(s => f >= s.in - PIC_PRE * fps && f < s.in);
+    const want = next ? toRec(v.currentTime) : null;
+    let badge = "";
+    for (const [name, el] of Object.entries(picEls)) {
+      if (!next || next.to !== name || want == null) { if (!el.paused) el.pause(); el.style.display = "none"; continue; }
+      const drift = Math.abs(el.currentTime - want);
+      if (v.paused) { if (!el.paused) el.pause(); if (drift > 0.5 / fps && !el.seeking) el.currentTime = want; }
+      else {
+        el.playbackRate = v.playbackRate;
+        if (drift > 0.12 && !el.seeking) el.currentTime = want;
+        if (el.paused) el.play().catch(() => {});
+      }
+      const was = el.style.display === "block";
+      const show = !!on && el.readyState >= 2 && (!el.seeking || was);
+      el.style.display = show ? "block" : "none";
+      if (show) badge = name;
+    }
+    $("picBadge").style.display = badge ? "block" : "none";
+    if (badge) $("picBadge").textContent = "Trying: " + badge;
+  }
+  async function loadSources() {
+    try { src = await (await fetch("/api/sources")).json(); } catch (e) { return; }
+    if (!src.pictures || src.pictures.length < 2) { src = { pictures: [], map: [], up: [] }; return; }
+    src.pictures.forEach((p, i) => {
+      const el = document.createElement("video");
+      el.className = "pic"; el.muted = true; el.playsInline = true; el.preload = "metadata"; el.src = "/picture/" + i;
+      el.addEventListener("seeked", () => { if (v.paused) paint(); });
+      el.addEventListener("loadeddata", () => { if (v.paused) paint(); });
+      $("stage").insertBefore(el, $("picBadge"));
+      picEls[p.name] = el;
+    });
+  }
+
+  // The timeline: three seconds of sound around each edge of the cut being tried, one frame wide
+  // enough to grab. The red side is what comes out.
+  const TL_DUR = 3;
+  let tlOpen = store.get("local-review-tl") !== "0", tlTimer = null;
+  const tl = { in: { start: 0, peaks: null, want: "" }, out: { start: 0, peaks: null, want: "" } };
+  const tlObj = () => draft[tlWhich] || null;
+  function playEdit(which, edge) {   // a cut plays across its join; a switch plays across the edge just moved
+    const o = draft[which]; if (!o) return;
+    if (which === "cut") playJoin(o); else { const f = o[edge || "in"]; playJoin({ in: f, out: f }); }
+  }
+  const tlPane = edge => document.querySelector(`#tl .pane[data-edge="${edge}"]`);
+  function tlReset() { for (const k of ["in", "out"]) { tl[k].peaks = null; tl[k].want = ""; } }
+  async function tlLoad(edge) {
+    if (!tlObj() || !tlOpen) return;
+    const pane = tlPane(edge), n = Math.max(50, Math.floor(pane.clientWidth));
+    const dur = Math.max(TL_DUR, 0), mid = tlObj()[edge] / fps;
+    const start = Math.max(0, Math.min(mid - dur / 2, Math.max(0, (v.duration || mid + dur) - dur)));
+    const want = `${start.toFixed(3)}:${n}`;
+    if (tl[edge].want === want) return;
+    tl[edge].want = want;
+    try {
+      const j = await (await fetch(`/api/wave?start=${start.toFixed(4)}&dur=${dur}&n=${n}`)).json();
+      if (tl[edge].want !== want) return;
+      tl[edge].start = start; tl[edge].peaks = j.peaks || [];
+    } catch (e) { tl[edge].peaks = []; tl[edge].start = start; }
+    tlDraw();
+  }
+  function tlDraw() {
+    if (!tlObj() || !tlOpen || !composing()) return;
+    const css = getComputedStyle(document.documentElement), col = k => css.getPropertyValue(k).trim();
+    for (const edge of ["in", "out"]) {
+      const pane = tlPane(edge), cv = pane.querySelector("canvas"), st = tl[edge];
+      const w = pane.clientWidth, h = pane.clientHeight, dpr = window.devicePixelRatio || 1;
+      if (!w) continue;
+      if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+      const g = cv.getContext("2d");
+      g.setTransform(dpr, 0, 0, dpr, 0, 0);
+      g.fillStyle = col("--bg"); g.fillRect(0, 0, w, h);
+      pane.querySelector(".lbl").textContent = (edge === "in" ? "In " : "Out ") + tc(tlObj()[edge]);
+      if (!st.peaks) continue;
+      const x = t => (t - st.start) / TL_DUR * w;
+      const a = Math.max(0, x(tlObj().in / fps)), b = Math.min(w, x(tlObj().out / fps));
+      const tint = tlWhich === "cut" ? col("--danger") : col("--sw");
+      if (b > a) { g.globalAlpha = .18; g.fillStyle = tint; g.fillRect(a, 0, b - a, h); g.globalAlpha = 1; }
+      pane.querySelector(".hint").textContent = tlWhich === "cut" ? (edge === "in" ? "cut starts" : "cut ends") : (edge === "in" ? `${tlObj().to} comes up` : `${tlObj().to} goes away`);
+      const pxf = w / (TL_DUR * fps);   // pixels per frame
+      for (let f = Math.ceil(st.start * fps); f / fps < st.start + TL_DUR; f++) {
+        const sec = f % tcfps === 0;
+        if (!sec && pxf < 4) continue;
+        g.fillStyle = sec ? col("--dim") : col("--line");
+        g.fillRect(Math.round(x(f / fps)), sec ? 0 : h - 8, 1, sec ? h : 8);
+      }
+      const peak = Math.max(0.05, ...st.peaks.map(p => Math.max(-p[0], p[1]))), mid = h / 2 + 6, amp = (h / 2 - 12) / peak;
+      st.peaks.forEach((p, i) => {
+        const px = i * w / st.peaks.length;
+        g.fillStyle = px >= a && px < b ? tint : col("--text");
+        const top = mid - p[1] * amp, bot = mid - p[0] * amp;
+        g.fillRect(px, top, Math.max(1, w / st.peaks.length), Math.max(1, bot - top));
+      });
+      g.fillStyle = tint; g.fillRect(Math.round(x(tlObj()[edge] / fps)) - 1, 0, 2, h);
+      const ph = x(v.currentTime);
+      if (ph >= 0 && ph <= w) { g.fillStyle = col("--accent"); g.fillRect(Math.round(ph), 0, 1, h); }
+    }
+  }
+  function tlSetEdge(edge, f) {
+    const c = tlObj(); if (!c) return false;
+    f = edge === "in" ? Math.min(c.out - 1, Math.max(0, f)) : Math.max(c.in + 1, Math.min(lastFrame() + 1, f));
+    if (f === c[edge]) return false;
+    c[edge] = f;
+    v.pause();
+    seekFrame(edge === "in" && tlWhich === "cut" ? Math.max(0, f - 1) : f);   // a cut's In shows the last frame kept; every other edge, the first frame after it
+    drawDraft();
+    return true;
+  }
+  function tlSettle(edge, wait) {   // once he stops moving it: recenter the view and play the join
+    clearTimeout(tlTimer);
+    tlTimer = setTimeout(() => { if (tlObj() && composing()) { tlLoad(edge); playEdit(tlWhich, edge); } }, wait);
+  }
+  for (const edge of ["in", "out"]) {
+    const pane = tlPane(edge);
+    let drag = false;
+    const frameAtX = e => { const r = pane.getBoundingClientRect(); return Math.round((tl[edge].start + (e.clientX - r.left) / r.width * TL_DUR) * fps); };
+    pane.addEventListener("pointerdown", e => { if (!tl[edge].peaks) return; drag = true; pane.setPointerCapture(e.pointerId); pane.focus(); clearTimeout(tlTimer); tlSetEdge(edge, frameAtX(e)); });
+    pane.addEventListener("pointermove", e => { if (drag) tlSetEdge(edge, frameAtX(e)); });
+    pane.addEventListener("pointerup", () => { if (drag) { drag = false; tlSettle(edge, 150); } });
+    pane.addEventListener("keydown", e => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const k = e.key;
+      if (k === "ArrowLeft" || k === "ArrowRight") { tlSetEdge(edge, tlObj()[edge] + (k === "ArrowLeft" ? -1 : 1) * (e.shiftKey ? 5 : 1)); tlSettle(edge, 700); }
+      else if (k === " ") { clearTimeout(tlTimer); playEdit(tlWhich, edge); }
+      else if (k === "Enter" || k === "Escape") $("noteText").focus();
+      else return;
+      e.preventDefault(); e.stopPropagation();
+    });
+  }
+  window.addEventListener("resize", () => { if (composing() && tlObj() && tlOpen) { tlLoad("in"); tlLoad("out"); tlDraw(); } });
+
+  function drawCutsBtn() {
+    const all = notes.filter(n => n.cut), sws = notes.filter(n => n.switch), b = $("cutsBtn");
+    b.style.display = all.length || sws.length ? "inline-block" : "none";
+    b.classList.toggle("on", cutsOn);
+    const total = all.reduce((t, n) => t + cutSecs(n.cut), 0), parts = [];
+    if (all.length) parts.push(`${all.length} cut${all.length === 1 ? "" : "s"}${cutsOn ? ` −${total.toFixed(1)} s` : ""}`);
+    if (sws.length) parts.push(`${sws.length} switch${sws.length === 1 ? "" : "es"}`);
+    b.textContent = `Your edits ${cutsOn ? "on" : "off"} · ${parts.join(" · ")}`;
+  }
+
   // Readout and scrub bar.
   function pct(f) { return lastFrame() ? (f / lastFrame()) * 100 : 0; }
   function paint() {
-    const f = frameNow();
+    let f = frameNow();
+    if (!v.paused && !v.seeking) {
+      if (joinStop !== null && f >= joinStop) { joinStop = null; v.pause(); }
+      else { const c = cutAt(f); if (c) { v.currentTime = (c.out + 0.25) / fps; f = c.out; } }
+    }
     $("tc").textContent = tc(f);
     $("fill").style.width = pct(f) + "%";
     $("head").style.left = pct(f) + "%";
@@ -305,9 +544,11 @@
       el.classList.toggle("now", f >= a && f <= b);
     });
     followMarkers(); paintWord();
+    if (draft.cut || draft.sw) tlDraw();
+    if (src.pictures.length) syncPictures(f);
   }
   function loop() { paint(); (v.requestVideoFrameCallback ? v.requestVideoFrameCallback(loop) : requestAnimationFrame(loop)); }
-  v.addEventListener("seeked", paint); v.addEventListener("pause", paint); v.addEventListener("play", loop);
+  v.addEventListener("seeked", paint); v.addEventListener("pause", () => { joinStop = null; paint(); }); v.addEventListener("play", loop);
 
   // The marker list keeps the current marker in view, unless the reviewer just scrolled it.
   function followMarkers() {
@@ -330,6 +571,11 @@
   function drawTicks() {
     const t = $("ticks"); t.innerHTML = "";
     for (const m of markers) t.insertAdjacentHTML("beforeend", `<div class="tick c${checked.has(m.id) ? " done" : ""}${isCarried(m) ? " carried" : ""}" style="left:${pct(m.frame)}%" title="${esc(tc(m.frame) + "  " + m.text)}"></div>`);
+    for (const n of notes) if (n.cut && n !== editing) t.insertAdjacentHTML("beforeend", `<div class="cutbar${cutsOn ? "" : " off"}" style="left:${pct(n.cut.in)}%;width:${Math.max(0.15, pct(n.cut.out) - pct(n.cut.in))}%"></div>`);
+    const swbar = (c, cls) => t.insertAdjacentHTML("beforeend", `<div class="swbar${cls}" style="left:${pct(c.in)}%;width:${Math.max(0.15, pct(c.out) - pct(c.in))}%" title="${esc(c.to)} up"></div>`);
+    for (const n of notes) if (n.switch && n !== editing) swbar(n.switch, cutsOn ? "" : " off");
+    if (composing() && draft.sw) swbar(draft.sw, " trying");
+    if (composing() && draft.cut) t.insertAdjacentHTML("beforeend", `<div class="cutbar trying" style="left:${pct(draft.cut.in)}%;width:${Math.max(0.15, pct(draft.cut.out) - pct(draft.cut.in))}%"></div>`);
     for (const n of notes) t.insertAdjacentHTML("beforeend", `<div class="tick n ${esc(n.kind || "")}" style="left:${pct(n.frame)}%" title="${esc(tc(n.frame) + "  " + n.text)}"></div>`);
   }
   function drawChips() {
@@ -379,11 +625,13 @@
         <div><div class="t">${tc(n.frame)}${n.end_frame != null ? " – " + tc(n.end_frame) : ""}${n.kind ? `<span class="badge ${esc(n.kind)}">${n.kind === "keep" ? "Keep" : "Rule"}</span>` : ""}</div>
           ${replied ? `<div class="note-reply">Reply to: ${esc(shorten(replied.text, 60))}</div>` : ""}
           ${n.quote ? `<div class="note-quote">${esc(shorten(n.quote, 220))}</div>` : ""}
+          ${n.cut ? `<div class="note-cut">Cut ${tc(n.cut.in)} – ${tc(n.cut.out)} · ${cutSecs(n.cut).toFixed(2)} s<button data-act="join" title="Play across this join">Play the join</button></div>` : ""}
+          ${n.switch ? `<div class="note-sw">${esc(n.switch.to)} up ${tc(n.switch.in)} – ${tc(n.switch.out)} · ${cutSecs(n.switch).toFixed(2)} s<button data-act="swplay" title="Play across this switch">Play it</button></div>` : ""}
           <div class="txt">${esc(n.text)}</div>
           ${n.image_url ? `<img class="note-img" src="${esc(n.image_url)}" alt="Grabbed frame" loading="lazy">` : ""}</div>
         <div class="acts"><button data-act="edit">Edit</button><button data-act="del">✕</button></div></div>`; }).join("")
       : `<div class="empty">Press C (or + Note) to leave a note at the current frame, or highlight words in the transcript.</div>`;
-    drawTicks(); markWords();
+    drawTicks(); markWords(); drawCutsBtn();
     if (!v.seeking) paint();
   }
   for (const list of ["mList", "nList"]) $(list).addEventListener("click", e => {
@@ -391,6 +639,8 @@
     const id = it.dataset.id;
     if (e.target.type === "checkbox") { e.target.checked ? checked.add(id) : checked.delete(id); drawLists(); queueSave(); return; }
     if (e.target.dataset.act === "del") { if (confirm("Delete this note?")) { notes = notes.filter(n => n.id !== id); drawLists(); queueSave(); } return; }
+    if (e.target.dataset.act === "join") { const n = notes.find(n => n.id === id); if (!cutsOn) { cutsOn = true; drawLists(); } playJoin(n.cut); return; }
+    if (e.target.dataset.act === "swplay") { const n = notes.find(n => n.id === id); if (!cutsOn) { cutsOn = true; drawLists(); } playJoin({ in: n.switch.in, out: n.switch.in }); return; }
     if (e.target.dataset.act === "edit") { const n = notes.find(n => n.id === id); seekFrame(n.frame); openComposer(n); return; }
     if (e.target.dataset.act === "reply") { const m = markers.find(m => m.id === id); curMarker = m; v.pause(); seekFrame(m.frame); openComposer(null, { marker: m }); return; }
     v.pause();
@@ -419,6 +669,26 @@
     $("composeQuote").textContent = draft.quote || "";
     $("composeImg").style.display = draft.image ? "block" : "none";
     if (draft.image) $("composeImg").src = draft.image.url;
+    const e = $("composer").dataset.e, hasRange = e !== "" && e != null && +e !== +$("composer").dataset.f;
+    $("cutRow").style.display = hasRange || draft.cut ? "flex" : "none";
+    $("cutBtn").classList.toggle("on", !!draft.cut);
+    $("cutBtn").textContent = draft.cut ? "Trying this cut" : "Try this cut";
+    $("cutEdit").style.display = draft.cut ? "contents" : "none";
+    if (draft.cut) $("cutWhen").textContent = `${tc(draft.cut.in)} – ${tc(draft.cut.out)} · ${cutSecs(draft.cut).toFixed(2)} s out`;
+    $("swRow").style.display = src.pictures.length || draft.sw ? "flex" : "none";
+    $("swBtn").classList.toggle("on", !!draft.sw);
+    $("swBtn").textContent = draft.sw ? "Trying this switch" : "Try a switch";
+    $("swEdit").style.display = draft.sw ? "contents" : "none";
+    if (draft.sw) {
+      $("swPics").innerHTML = src.pictures.map(p => `<button data-pic="${esc(p.name)}" class="${p.name === draft.sw.to ? "on" : ""}" title="Put ${esc(p.name)} up for this stretch">${esc(p.name)}</button>`).join("");
+      $("swWhen").textContent = `${tc(draft.sw.in)} – ${tc(draft.sw.out)} · ${cutSecs(draft.sw).toFixed(2)} s`;
+    }
+    if (!draft[tlWhich]) tlWhich = draft.cut ? "cut" : "sw";
+    $("tlBtn").classList.toggle("on", tlOpen && tlWhich === "cut");
+    $("swTlBtn").classList.toggle("on", tlOpen && tlWhich === "sw");
+    $("tl").style.display = tlObj() && tlOpen ? "flex" : "none";
+    drawTicks(); markWords();
+    if (tlObj() && tlOpen) { if (!tl.in.peaks && !tl.in.want) tlLoad("in"); if (!tl.out.peaks && !tl.out.want) tlLoad("out"); tlDraw(); }
   }
   function openComposer(existing, opts) {
     opts = opts || {};
@@ -433,30 +703,74 @@
     const here = opts.marker || (!existing && !sel && markerHere(8));   // a note soon after a marker is about it
     draft = existing
       ? { kind: existing.kind || "change", quote: existing.quote || null, marker_id: existing.marker_id || null,
-          image: existing.image ? { url: existing.image_url, path: existing.image } : null }
+          image: existing.image ? { url: existing.image_url, path: existing.image } : null,
+          cut: existing.cut ? { in: existing.cut.in, out: existing.cut.out } : null,
+          sw: existing.switch ? { to: existing.switch.to, in: existing.switch.in, out: existing.switch.out } : null }
       : { kind: "change", quote: sel ? words.slice(sel[0], sel[1] + 1).map(w => w.w).join(" ") : null,
-          marker_id: here ? here.id : null, image: opts.image || null };
+          marker_id: here ? here.id : null, image: opts.image || null, cut: null, sw: null };
     $("composer").dataset.f = f; $("composer").dataset.e = e == null ? "" : e;
     $("composeAt").textContent = tc(f) + (e != null && e !== f ? " – " + tc(e) : "");
     $("noteText").value = existing ? existing.text : "";
+    $("noteText").placeholder = PLACEHOLDER;
+    tlReset();
+    $("composer").classList.add("open");
     drawDraft();
     clearSelection();
-    $("composer").classList.add("open"); $("noteText").focus();
+    $("noteText").focus();
   }
-  function closeComposer() { $("composer").classList.remove("open"); editing = null; $("noteText").blur(); }
+  function closeComposer() { $("composer").classList.remove("open"); editing = null; joinStop = null; $("noteText").blur(); drawTicks(); markWords(); }
   function saveComposer() {
     const text = $("noteText").value.trim();
+    if ((draft.cut || draft.sw) && !text) {   // the edit shows it; the note still has to say it
+      $("noteText").placeholder = "Say what you want here, and why. The edit shows it; your note says it. Then Enter.";
+      $("noteText").focus(); return;
+    }
     if (!text && !draft.quote && !draft.image) { closeComposer(); return; }
     const f = +$("composer").dataset.f, e = $("composer").dataset.e === "" ? null : +$("composer").dataset.e;
     const now = new Date().toISOString().slice(0, 19);
     const extra = { kind: draft.kind === "change" ? undefined : draft.kind, quote: draft.quote || undefined,
                     marker_id: draft.marker_id || undefined, image: draft.image ? draft.image.path : undefined,
-                    image_url: draft.image ? draft.image.url : undefined };
+                    image_url: draft.image ? draft.image.url : undefined,
+                    cut: draft.cut ? { in: draft.cut.in, out: draft.cut.out, in_tc: tc(draft.cut.in), out_tc: tc(draft.cut.out),
+                                       rec_in: recOf(draft.cut.in), rec_out: recOf(draft.cut.out) } : undefined,
+                    switch: draft.sw ? { to: draft.sw.to, in: draft.sw.in, out: draft.sw.out, in_tc: tc(draft.sw.in), out_tc: tc(draft.sw.out),
+                                         rec_in: recOf(draft.sw.in), rec_out: recOf(draft.sw.out - 1) } : undefined };
     if (editing) Object.assign(editing, { text, updated: now }, extra);
     else notes.push({ id: "n" + Date.now().toString(36), frame: f, tc: tc(f), end_frame: e !== f ? e : null,
       end_tc: e != null && e !== f ? tc(e) : null, text, created: now, updated: now, ...extra });
     inFrame = null; closeComposer(); drawLists(); queueSave(); paint();
   }
+  const PLACEHOLDER = $("noteText").placeholder;
+  for (const row of [$("cutRow"), $("swRow")]) {
+    const which = row.dataset.which;
+    row.addEventListener("mousedown", e => e.preventDefault());   // keep the cursor in the note
+    row.onclick = e => {
+      const b = e.target.closest("button"); if (!b) return;
+      const f = +$("composer").dataset.f, raw = $("composer").dataset.e, end = raw === "" ? null : +raw;
+      if (b.dataset.tl) {
+        if (tlOpen && tlWhich === which) tlOpen = false; else { tlOpen = true; tlWhich = which; }
+        store.set("local-review-tl", tlOpen ? "1" : "0"); tlReset(); drawDraft(); return;
+      }
+      let edge = "in";
+      if (b.dataset.toggle) {
+        if (draft[which]) draft[which] = null;
+        else { draft[which] = which === "cut" ? { in: f, out: end + 1 } : defaultSwitch(f, end !== null && end !== f ? end : null); tlWhich = which; }
+        tlReset();
+      } else if (b.dataset.pic && draft.sw) draft.sw.to = b.dataset.pic;
+      else if (b.dataset.nudge && draft[which]) {
+        const c = draft[which], d = +b.dataset.d;
+        edge = b.dataset.nudge;
+        if (edge === "in") c.in = Math.min(c.out - 1, Math.max(0, c.in + d));
+        else c.out = Math.max(c.in + 1, Math.min(lastFrame() + 1, c.out + d));
+        if (tlWhich !== which) { tlWhich = which; tlReset(); }
+      }
+      drawDraft();
+      if (!draft[which]) { v.pause(); paint(); return; }
+      if (b.dataset.nudge) tlLoad(edge);
+      playEdit(which, edge);
+    };
+  }
+  $("cutsBtn").onclick = () => { cutsOn = !cutsOn; drawLists(); $("cutsBtn").blur(); };
   $("saveNote").onclick = saveComposer;
   $("kinds").onclick = e => { const k = e.target.dataset.k; if (k) { draft.kind = k; drawDraft(); $("noteText").focus(); } };
   $("composeReply").onclick = e => { if (e.target.id === "noReply") { draft.marker_id = null; drawDraft(); $("noteText").focus(); } };
@@ -519,7 +833,15 @@
   }
   function markWords() {
     if (!wordEls.length) return;
-    wordEls.forEach(el => el.classList.remove("noted", "mk"));
+    wordEls.forEach(el => el.classList.remove("noted", "mk", "democut", "demosw"));
+    for (const c of activeSw()) {
+      const a = c.in / fps, b = c.out / fps;
+      for (let i = Math.max(0, wordAt(a)); i < words.length && words[i].s < b; i++) if (words[i].e > a) wordEls[i].classList.add("demosw");
+    }
+    for (const c of activeCuts()) {
+      const a = c.in / fps, b = c.out / fps;
+      for (let i = Math.max(0, wordAt(a)); i < words.length && words[i].s < b; i++) if ((words[i].s + words[i].e) / 2 >= a && (words[i].s + words[i].e) / 2 < b) wordEls[i].classList.add("democut");
+    }
     for (const n of notes) {
       if (n.end_frame == null) continue;
       const a = n.frame / fps, b = n.end_frame / fps;
@@ -675,6 +997,7 @@
       "[": () => jumpMarker(-1), "]": () => jumpMarker(1), x: tickAndNext, X: tickAndNext,
       c: () => openComposer(), C: () => openComposer(), Enter: () => openComposer(),
       g: grabFrame, G: grabFrame, t: () => $("txBtn").click(), T: () => $("txBtn").click(),
+      d: () => $("cutsBtn").click(), D: () => $("cutsBtn").click(),
       i: () => { inFrame = frameNow(); paint(); }, I: () => { inFrame = frameNow(); paint(); },
       Escape: () => { $("help").classList.remove("open"); $("openPop").classList.remove("open"); inFrame = null; clearSelection(); paint(); },
       "?": () => $("help").classList.toggle("open"),
@@ -695,6 +1018,7 @@
     document.title = "Review · " + cfg.title; $("title").textContent = cfg.title;
     ownMarkers = ((await (await fetch("/api/markers")).json()).markers || []).map((m, i) => ({ ...m, id: m.id || "m" + (i + 1) }));
     rebuildMarkers();
+    await loadSources();
     const saved = await (await fetch("/api/notes")).json();
     notes = saved.notes || []; checked = new Set(saved.markers_checked || []);
     try { filters = { ...filters, ...JSON.parse(store.get("local-review-filters:" + cfg.video) || "{}") }; } catch (e) {}

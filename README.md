@@ -8,7 +8,7 @@ I'm Jack Rome. I build these with Claude in my own work, and you can see more of
 |---|---|---|---|
 | [fair-share](fair-share/) | Claude skill | Checks AI-assisted work from both sides of a handoff, so what you send respects the person reading it | 2026-10-18 |
 | [graft](graft/) | Claude skill | Decides item by item what, if anything, to take from a video, repo or list of tools, and keeps a ledger of every verdict | 2026-10-18 |
-| [local-review](local-review/) | Claude skill and Mac app | Reviews video drafts on your Mac: notes on exact frames, a transcript beside the video, and markers from the assistant that made the cut | 2026-11-07 |
+| [local-review](local-review/) | Claude skill and Mac app | Reviews video drafts on your Mac: notes on exact frames, a transcript beside the video, markers from the assistant that made the cut, and a way to show the cut you mean | 2026-11-14 |
 | [synthesize](synthesize/) | Claude skill | Reads a source for what it means to you: resonance, friction, what to do with it, and a chance to say it back | 2026-10-18 |
 
 Each folder has its own README with how to install it and use it.

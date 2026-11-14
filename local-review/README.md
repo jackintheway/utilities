@@ -8,7 +8,7 @@ I've been editing video for 15 years. My review loop for my own drafts used to r
 
 So I asked Claude Code for something that lets me comment at any point and gives the assistant the timestamps the same way Frame.io does. It takes the parts I love from the tools I use: a transcript next to playback like Riverside and Descript, timestamped comments like Frame.io, and in and out points like Premiere.
 
-It doesn't edit, and for now that's on purpose. Because I can't change the cut from inside it, I have to put into words exactly what I want, and being forced to articulate what I really want is making me a better director and collaborator.
+It doesn't edit, and for now that's on purpose. It can show the edit I mean, but the cut itself still happens in my editing app. Even when I can show Claude the cut I mean, I still have to put into words what I want, and being forced to articulate what I really want is making me a better director and collaborator.
 
 ## What it does
 
@@ -18,6 +18,8 @@ It doesn't edit, and for now that's on purpose. Because I can't change the cut f
 - Shows Claude's markers on everything it changed, every call it made and anything it couldn't check from the file. X ticks one and plays the next.
 - On a later draft, hides the markers you already okayed, and marks every cut it hears in the speech.
 - Notes can be a Change, a Keep (leave this alone) or a Rule (do this from now on), and G grabs the exact frame as a full-size still.
+- A note on a range can show the cut it asks for. Try this cut skips it in playback so you hear the join, a zoomed timeline sets each edge to the frame, and every cut you try plays together, with D to turn them off and on. The note still needs words.
+- With a sources file beside the export (its shape is in SKILL.md), a note can also show a picture switch, laying another raw recording over a stretch in step with the sound.
 
 The whole story is in the [Local Reviewer case study](https://jackrome.work/case-studies/local-reviewer).
 
@@ -45,7 +47,7 @@ The first time you open a video, the transcript takes about 30 seconds for 45 mi
 
 ## What it won't do
 
-- Edit. Cuts still happen in your editing app.
+- Edit. It can show Claude a cut or a switch, but the real cut still happens in your editing app.
 - Leave your computer. It only answers on 127.0.0.1, and a review with anyone else belongs in a tool built for that.
 - Hear anything but English, or tell speakers apart.
 - Notice a change that is only in the picture. Claude flags those itself.
@@ -54,4 +56,4 @@ The first time you open a video, the transcript takes about 30 seconds for 45 mi
 
 The ideas are borrowed from tools I love: Frame.io for frame comments, Riverside and Descript for a transcript beside playback, and Premiere for in and out points. Transcription is [whisper.cpp](https://github.com/ggerganov/whisper.cpp).
 
-Updated 2026-11-07
+Updated 2026-11-14
